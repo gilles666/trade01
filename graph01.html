@@ -17,9 +17,11 @@
     .legend { display:flex; gap: 16px; font-size: 12px; color: var(--muted); padding: 6px 8px; }
     .pill { padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); }
     .row { display:flex; gap: 12px; align-items:center; flex-wrap: wrap; }
-    button, select { background: rgba(255,255,255,0.06); color: var(--fg); border:1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 8px 10px; cursor: pointer; }
+    button, select, input { background: rgba(255,255,255,0.06); color: var(--fg); border:1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 8px 10px; }
+    button { cursor: pointer; }
     a { color:#9ecbff; }
     footer { margin-top: 16px; font-size: 12px; color: var(--muted); }
+    .hint { font-size:12px; color: var(--muted); }
   </style>
 </head>
 <body>
@@ -28,14 +30,24 @@
       <h1>Graphique live + SMA/EMA (Lightweight Charts)</h1>
       <div class="row">
         <label>
-          Source de données:
+          Source de données :
           <select id="dataSource">
             <option value="simulated">Simulation (démo)</option>
-            <option value="ws">WebSocket (custom)</option>
+            <option value="binance">Binance (trades → bougies 1s)</option>
+            <option value="ws">WebSocket personnalisé</option>
           </select>
         </label>
-        <button id="reset">Réinitialiser</button>
+        <label>
+          Symbole (Binance):
+          <input id="symbol" value="btcusdt" size="10" />
+        </label>
+        <label>
+          WS perso:
+          <input id="customWsUrl" placeholder="wss://example.com/your-stream" size="28" />
+        </label>
+        <button id="reset">Démarrer / Réinitialiser</button>
       </div>
+      <div class="hint">Binance: utilise le flux <code>@trade</code> et agrège en bougies d'1 seconde côté client. WS perso: envoyez des JSON {time, open, high, low, close} (time en secondes).</div>
     </header>
 
     <div class="card">
@@ -51,7 +63,7 @@
     <footer>
       <p>
         Ce composant utilise <a href="https://github.com/tradingview/lightweight-charts" target="_blank" rel="noreferrer">Lightweight Charts</a> (par TradingView), idéal pour une intégration 100% front-end sur GitHub Pages.
-        Si vous avez besoin du <em>Charting Library</em> complet de TradingView (avec dessin, indicateurs intégrés avancés, multi-charts, etc.), vous devez demander une licence gratuite non‑commerciale ou commerciale et mettre en place un <em>datafeed</em> UDF. Voir la note dans le code.
+        Si vous avez besoin du <em>Charting Library</em> complet de TradingView (avec dessin, indicateurs intégrés avancés, multi-charts, etc.), vous devez demander une licence et mettre en place un <em>datafeed</em> UDF. Voir la note dans le code.
       </p>
     </footer>
   </div>
@@ -109,30 +121,52 @@
     const emaLabel = document.getElementById('emaLabel');
     const priceLabel = document.getElementById('priceLabel');
 
-    function pushBar(bar) {
-      candles.push(bar);
-      candleSeries.update(bar);
+    function addOrUpdateBar(bar) {
+      const last = candles[candles.length-1];
+      if (last && last.time === bar.time) {
+        // update candle in place
+        last.open = bar.open;
+        last.high = Math.max(last.high, bar.high);
+        last.low  = Math.min(last.low, bar.low);
+        last.close = bar.close;
+        candleSeries.update(last);
+      } else {
+        candles.push(bar);
+        candleSeries.update(bar);
+      }
 
       const sma = calcSMA(bar.close);
       const ema = calcEMA(bar.close);
 
       if (sma !== null) {
         const pt = { time: bar.time, value: +sma.toFixed(2) };
-        smaValues.push(pt); smaSeries.update(pt);
+        if (smaValues.length && smaValues[smaValues.length-1].time === bar.time) {
+          smaValues[smaValues.length-1] = pt;
+          smaSeries.update(pt);
+        } else {
+          smaValues.push(pt); smaSeries.update(pt);
+        }
         smaLabel.textContent = `SMA(${smaPeriod}): ${pt.value}`;
       }
       if (ema !== null) {
         const pt = { time: bar.time, value: +ema.toFixed(2) };
-        emaValues.push(pt); emaSeries.update(pt);
+        if (emaValues.length && emaValues[emaValues.length-1].time === bar.time) {
+          emaValues[emaValues.length-1] = pt;
+          emaSeries.update(pt);
+        } else {
+          emaValues.push(pt); emaSeries.update(pt);
+        }
         emaLabel.textContent = `EMA(${emaPeriod}): ${pt.value}`;
       }
       priceLabel.textContent = `Dernier: ${bar.close}`;
     }
 
-    // === 2) Générer un historique minimal (bougies 1s) ===
+    // === 2) Historique minimal (bougies 1s) ===
     function seedHistory(n=200) {
       const now = Math.floor(Date.now()/1000);
       let last = 50000; // prix de base fictif
+      const tmpCloses = [];
+      const tmpSeed = [];
       for (let i=n; i>0; i--) {
         const t = now - i;
         const vol = (Math.random()*20)+5;
@@ -146,7 +180,8 @@
       }
       candleSeries.setData(candles);
 
-      // calculer SMA/EMA sur l'historique
+      // recalculer SMA/EMA depuis zéro
+      closes.length = 0; seed.length = 0; emaPrev = null; smaValues.length = 0; emaValues.length = 0;
       candles.forEach(c => {
         const sma = calcSMA(c.close);
         const ema = calcEMA(c.close);
@@ -177,28 +212,77 @@
         const close = +(open + delta).toFixed(2);
         const high = Math.max(open, close) + Math.random()*6;
         const low  = Math.min(open, close) - Math.random()*6;
-        pushBar({ time: t, open, high, low, close });
+        addOrUpdateBar({ time: t, open, high, low, close });
       }, 1000);
     }
 
-    function startWsFeed(url="wss://example.com/your-stream") {
+    function startCustomWsFeed(url) {
       stopFeeds();
+      if (!url) { alert('Renseignez l\'URL du WebSocket personnalisé'); return; }
       ws = new WebSocket(url);
-      ws.onopen = () => console.log('WS connecté');
+      ws.onopen = () => console.log('WS perso connecté');
       ws.onmessage = (evt) => {
         // Attendez un payload au format: {time, open, high, low, close}
         try {
           const msg = JSON.parse(evt.data);
-          if (msg.time && msg.open!=null) pushBar(msg);
+          if (msg.time && msg.open!=null) addOrUpdateBar(msg);
         } catch(e) { console.warn('WS message invalide', e); }
       };
-      ws.onclose = () => console.log('WS fermé');
-      ws.onerror = (e) => console.error('WS erreur', e);
+      ws.onclose = () => console.log('WS perso fermé');
+      ws.onerror = (e) => console.error('WS perso erreur', e);
+    }
+
+    // Agrégation trades Binance -> bougies 1s
+    let binanceBucket = null; // {sec, open, high, low, close}
+    function flushBinanceBucket(force=false) {
+      if (!binanceBucket) return;
+      addOrUpdateBar({
+        time: binanceBucket.sec,
+        open: binanceBucket.open,
+        high: binanceBucket.high,
+        low:  binanceBucket.low,
+        close:binanceBucket.close,
+      });
+      if (force) binanceBucket = null;
+    }
+
+    function startBinanceTrades(symbol='btcusdt') {
+      stopFeeds();
+      const stream = `${symbol.toLowerCase()}@trade`;
+      const url = `wss://stream.binance.com:9443/ws/${stream}`;
+      ws = new WebSocket(url);
+      ws.onopen = () => { console.log('Binance connecté:', stream); binanceBucket = null; };
+      ws.onmessage = (evt) => {
+        try {
+          const t = JSON.parse(evt.data);
+          // structure: { e: 'trade', E: eventTime, s: 'BTCUSDT', t: tradeId, p: 'prix', q:'qty', b: buyerId, a: sellerId, T: tradeTime(ms), m: isBuyerMaker }
+          const price = parseFloat(t.p);
+          const sec = Math.floor(t.T / 1000);
+
+          if (!binanceBucket || binanceBucket.sec !== sec) {
+            // pousser le bucket précédent
+            flushBinanceBucket(true);
+            // démarrer un nouveau bucket sur cette seconde
+            binanceBucket = { sec, open: price, high: price, low: price, close: price };
+          } else {
+            // mettre à jour le bucket courant
+            binanceBucket.high = Math.max(binanceBucket.high, price);
+            binanceBucket.low  = Math.min(binanceBucket.low, price);
+            binanceBucket.close = price;
+          }
+          // Pousser une mise à jour "en cours" (sans fermer la bougie)
+          addOrUpdateBar({ time: sec, open: binanceBucket.open, high: binanceBucket.high, low: binanceBucket.low, close: binanceBucket.close });
+        } catch(e) {
+          console.warn('Binance trade invalide', e);
+        }
+      };
+      ws.onclose = () => { console.log('Binance fermé'); flushBinanceBucket(true); };
+      ws.onerror = (e) => console.error('Binance erreur', e);
     }
 
     function stopFeeds() {
       if (intervalId) { clearInterval(intervalId); intervalId = null; }
-      if (ws) { ws.close(); ws = null; }
+      if (ws) { try { ws.close(); } catch(e){} ws = null; }
     }
 
     // === 4) UI ===
@@ -208,22 +292,26 @@
       candleSeries.setData([]); smaSeries.setData([]); emaSeries.setData([]);
       seedHistory();
       const mode = document.getElementById('dataSource').value;
-      if (mode === 'simulated') startSimulatedFeed(); else startWsFeed();
+      const symbol = document.getElementById('symbol').value || 'btcusdt';
+      const custom = document.getElementById('customWsUrl').value || '';
+      if (mode === 'simulated') startSimulatedFeed();
+      else if (mode === 'binance') startBinanceTrades(symbol);
+      else if (mode === 'ws') startCustomWsFeed(custom);
     }
 
-    document.getElementById('dataSource').addEventListener('change', resetAll);
+    document.getElementById('dataSource').addEventListener('change', () => {});
     document.getElementById('reset').addEventListener('click', resetAll);
 
-    // Boot
+    // Boot par défaut: historique + simulation
     seedHistory();
     startSimulatedFeed();
 
     // === NOTE: Utiliser le Charting Library officiel de TradingView ===
     // - Le Charting Library (différent de Lightweight Charts) offre études/indicateurs intégrés, dessin, multi-charts.
     // - Il nécessite une licence (gratuite pour non-commercial, commerciale sinon) et un accès par domaine autorisé.
-    // - Vous devrez fournir un "Datafeed" (UDF) côté client/serveur pour injecter vos prix (ex: https://github.com/tradingview/charting_library/wiki/JS-Api#datafeed-api)
-    // - GitHub Pages convient pour héberger les assets statiques, mais si votre datafeed appelle une API, pensez CORS/HTTPS.
-    // - Pour juste intégrer un graphique TradingView prêt à l'emploi avec indicateurs, vous pouvez aussi utiliser l'iframe "Advanced Real-Time Chart" widget.
+    // - Vous devrez fournir un "Datafeed" (UDF) côté client/serveur pour injecter vos prix (cf. documentation officielle).
+    // - GitHub Pages convient pour héberger les assets statiques. Les WebSockets (comme Binance) passent sans CORS.
+    // - Pour intégrer un graphique TradingView prêt à l'emploi avec indicateurs, vous pouvez aussi utiliser l'iframe "Advanced Real-Time Chart" widget.
   </script>
 </body>
 </html>
