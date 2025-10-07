@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live Chart + Moyennes Mobiles (SMA/EMA) — GitHub Pages</title>
+  <!-- Lightweight Charts (par TradingView) - Open source, parfait pour GitHub Pages -->
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    :root { --bg:#0b1020; --fg:#e6e7ea; --muted:#9aa1b1; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    h1 { font-size: 20px; margin: 0; }
+    .card { background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); padding: 12px; }
+    #chart { height: 60vh; min-height: 360px; }
+    .legend { display:flex; gap: 16px; font-size: 12px; color: var(--muted); padding: 6px 8px; }
+    .pill { padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); }
+    .row { display:flex; gap: 12px; align-items:center; flex-wrap: wrap; }
+    button, select { background: rgba(255,255,255,0.06); color: var(--fg); border:1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 8px 10px; cursor: pointer; }
+    a { color:#9ecbff; }
+    footer { margin-top: 16px; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Graphique live + SMA/EMA (Lightweight Charts)</h1>
+      <div class="row">
+        <label>
+          Source de données:
+          <select id="dataSource">
+            <option value="simulated">Simulation (démo)</option>
+            <option value="ws">WebSocket (custom)</option>
+          </select>
+        </label>
+        <button id="reset">Réinitialiser</button>
+      </div>
+    </header>
+
+    <div class="card">
+      <div id="chart"></div>
+      <div class="legend" id="legend">
+        <span class="pill">Bougie OHLC</span>
+        <span class="pill" id="smaLabel">SMA(20): —</span>
+        <span class="pill" id="emaLabel">EMA(50): —</span>
+        <span class="pill" id="priceLabel">Dernier: —</span>
+      </div>
+    </div>
+
+    <footer>
+      <p>
+        Ce composant utilise <a href="https://github.com/tradingview/lightweight-charts" target="_blank" rel="noreferrer">Lightweight Charts</a> (par TradingView), idéal pour une intégration 100% front-end sur GitHub Pages.
+        Si vous avez besoin du <em>Charting Library</em> complet de TradingView (avec dessin, indicateurs intégrés avancés, multi-charts, etc.), vous devez demander une licence gratuite non‑commerciale ou commerciale et mettre en place un <em>datafeed</em> UDF. Voir la note dans le code.
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    // === 1) Créer le graphique ===
+    const container = document.getElementById('chart');
+    const chart = LightweightCharts.createChart(container, {
+      layout: { background: { color: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() }, textColor: getComputedStyle(document.documentElement).getPropertyValue('--fg').trim() },
+      grid: { vertLines: { color: 'rgba(255,255,255,0.06)'}, horzLines: { color: 'rgba(255,255,255,0.06)'} },
+      timeScale: { timeVisible: true, secondsVisible: true, borderColor: 'rgba(255,255,255,0.12)' },
+      rightPriceScale: { borderColor: 'rgba(255,255,255,0.12)' },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Magnet },
+      autoSize: true,
+    });
+
+    const candleSeries = chart.addCandlestickSeries();
+    const smaSeries = chart.addLineSeries({ lineWidth: 2 });
+    const emaSeries = chart.addLineSeries({ lineWidth: 2 });
+
+    const smaPeriod = 20;
+    const emaPeriod = 50;
+
+    // Buffers
+    const candles = []; // { time, open, high, low, close }
+    const smaValues = []; // { time, value }
+    const emaValues = []; // { time, value }
+
+    // Helpers SMA/EMA incrémentales
+    function calcSMA(latestClose) {
+      closes.push(latestClose);
+      if (closes.length > smaPeriod) closes.shift();
+      if (closes.length < smaPeriod) return null;
+      const sum = closes.reduce((a,b)=>a+b,0);
+      return sum / smaPeriod;
+    }
+
+    let emaPrev = null;
+    const k = 2 / (emaPeriod + 1);
+    function calcEMA(latestClose) {
+      if (emaPrev === null) { // amorçage par SMA des 1ers points
+        seed.push(latestClose);
+        if (seed.length < emaPeriod) return null;
+        emaPrev = seed.reduce((a,b)=>a+b,0) / emaPeriod;
+        return emaPrev;
+      }
+      emaPrev = latestClose * k + emaPrev * (1 - k);
+      return emaPrev;
+    }
+
+    const closes = []; // pour SMA
+    const seed = [];   // pour initialiser EMA
+
+    const smaLabel = document.getElementById('smaLabel');
+    const emaLabel = document.getElementById('emaLabel');
+    const priceLabel = document.getElementById('priceLabel');
+
+    function pushBar(bar) {
+      candles.push(bar);
+      candleSeries.update(bar);
+
+      const sma = calcSMA(bar.close);
+      const ema = calcEMA(bar.close);
+
+      if (sma !== null) {
+        const pt = { time: bar.time, value: +sma.toFixed(2) };
+        smaValues.push(pt); smaSeries.update(pt);
+        smaLabel.textContent = `SMA(${smaPeriod}): ${pt.value}`;
+      }
+      if (ema !== null) {
+        const pt = { time: bar.time, value: +ema.toFixed(2) };
+        emaValues.push(pt); emaSeries.update(pt);
+        emaLabel.textContent = `EMA(${emaPeriod}): ${pt.value}`;
+      }
+      priceLabel.textContent = `Dernier: ${bar.close}`;
+    }
+
+    // === 2) Générer un historique minimal (bougies 1s) ===
+    function seedHistory(n=200) {
+      const now = Math.floor(Date.now()/1000);
+      let last = 50000; // prix de base fictif
+      for (let i=n; i>0; i--) {
+        const t = now - i;
+        const vol = (Math.random()*20)+5;
+        const open = last;
+        const delta = (Math.random()-0.5) * vol;
+        const close = +(open + delta).toFixed(2);
+        const high = Math.max(open, close) + Math.random()*5;
+        const low  = Math.min(open, close) - Math.random()*5;
+        last = close;
+        candles.push({ time: t, open, high, low, close });
+      }
+      candleSeries.setData(candles);
+
+      // calculer SMA/EMA sur l'historique
+      candles.forEach(c => {
+        const sma = calcSMA(c.close);
+        const ema = calcEMA(c.close);
+        if (sma !== null) smaValues.push({ time:c.time, value:+sma.toFixed(2) });
+        if (ema !== null) emaValues.push({ time:c.time, value:+ema.toFixed(2) });
+      });
+      if (smaValues.length) smaSeries.setData(smaValues);
+      if (emaValues.length) emaSeries.setData(emaValues);
+
+      const lastC = candles[candles.length-1];
+      priceLabel.textContent = `Dernier: ${lastC.close}`;
+      if (smaValues.length) smaLabel.textContent = `SMA(${smaPeriod}): ${smaValues[smaValues.length-1].value}`;
+      if (emaValues.length) emaLabel.textContent = `EMA(${emaPeriod}): ${emaValues[emaValues.length-1].value}`;
+    }
+
+    // === 3) Flux live ===
+    let intervalId = null;
+    let ws = null;
+
+    function startSimulatedFeed() {
+      stopFeeds();
+      intervalId = setInterval(() => {
+        const t = Math.floor(Date.now()/1000);
+        const last = candles[candles.length-1] ?? { close: 50000 };
+        const open = last.close;
+        const vol = (Math.random()*28)+7;
+        const delta = (Math.random()-0.5) * vol;
+        const close = +(open + delta).toFixed(2);
+        const high = Math.max(open, close) + Math.random()*6;
+        const low  = Math.min(open, close) - Math.random()*6;
+        pushBar({ time: t, open, high, low, close });
+      }, 1000);
+    }
+
+    function startWsFeed(url="wss://example.com/your-stream") {
+      stopFeeds();
+      ws = new WebSocket(url);
+      ws.onopen = () => console.log('WS connecté');
+      ws.onmessage = (evt) => {
+        // Attendez un payload au format: {time, open, high, low, close}
+        try {
+          const msg = JSON.parse(evt.data);
+          if (msg.time && msg.open!=null) pushBar(msg);
+        } catch(e) { console.warn('WS message invalide', e); }
+      };
+      ws.onclose = () => console.log('WS fermé');
+      ws.onerror = (e) => console.error('WS erreur', e);
+    }
+
+    function stopFeeds() {
+      if (intervalId) { clearInterval(intervalId); intervalId = null; }
+      if (ws) { ws.close(); ws = null; }
+    }
+
+    // === 4) UI ===
+    function resetAll() {
+      stopFeeds();
+      candles.length = 0; smaValues.length = 0; emaValues.length = 0; closes.length = 0; seed.length = 0; emaPrev = null;
+      candleSeries.setData([]); smaSeries.setData([]); emaSeries.setData([]);
+      seedHistory();
+      const mode = document.getElementById('dataSource').value;
+      if (mode === 'simulated') startSimulatedFeed(); else startWsFeed();
+    }
+
+    document.getElementById('dataSource').addEventListener('change', resetAll);
+    document.getElementById('reset').addEventListener('click', resetAll);
+
+    // Boot
+    seedHistory();
+    startSimulatedFeed();
+
+    // === NOTE: Utiliser le Charting Library officiel de TradingView ===
+    // - Le Charting Library (différent de Lightweight Charts) offre études/indicateurs intégrés, dessin, multi-charts.
+    // - Il nécessite une licence (gratuite pour non-commercial, commerciale sinon) et un accès par domaine autorisé.
+    // - Vous devrez fournir un "Datafeed" (UDF) côté client/serveur pour injecter vos prix (ex: https://github.com/tradingview/charting_library/wiki/JS-Api#datafeed-api)
+    // - GitHub Pages convient pour héberger les assets statiques, mais si votre datafeed appelle une API, pensez CORS/HTTPS.
+    // - Pour juste intégrer un graphique TradingView prêt à l'emploi avec indicateurs, vous pouvez aussi utiliser l'iframe "Advanced Real-Time Chart" widget.
+  </script>
+</body>
+</html>
