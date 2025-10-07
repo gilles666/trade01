@@ -5,7 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Live Chart + Moyennes Mobiles (SMA/EMA) — GitHub Pages</title>
   <!-- Lightweight Charts (par TradingView) - Open source, parfait pour GitHub Pages -->
-  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <script>
+  // Charge Lightweight Charts avec fallback (unpkg -> jsDelivr)
+  (function loadLWC(d){
+    function inject(src, next){
+      var s=d.createElement('script'); s.src=src; s.async=false;
+      s.onload=function(){ console.log('Loaded', src); };
+      s.onerror=function(){ console.warn('Failed', src); next && next(); };
+      d.head.appendChild(s);
+    }
+    inject('https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js', function(){
+      inject('https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js');
+    });
+  })(document);
+</script>
   <style>
     :root { --bg:#0b1020; --fg:#e6e7ea; --muted:#9aa1b1; }
     html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
@@ -27,7 +40,7 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>Graphique live + SMA/EMA (Lightweight Charts) v1</h1>
+      <h1>Graphique live + SMA/EMA (Lightweight Charts) v2</h1>
       <div class="row">
         <label>
           Source de données :
@@ -57,6 +70,7 @@
         <span class="pill" id="smaLabel">SMA(20): —</span>
         <span class="pill" id="emaLabel">EMA(50): —</span>
         <span class="pill" id="priceLabel">Dernier: —</span>
+        <span class="pill" id="status">Statut: init…</span>
       </div>
     </div>
 
@@ -71,18 +85,28 @@
   <script>
     // === 1) Créer le graphique ===
     const container = document.getElementById('chart');
-    const chart = LightweightCharts.createChart(container, {
+    const statusEl = document.getElementById('status');
+    function setStatus(txt){ if(statusEl) statusEl.textContent = 'Statut: '+txt; }
+
+    if (!window.LightweightCharts) {
+      setStatus('librairie non chargée…');
+    }
+    const chart = window.LightweightCharts ? LightweightCharts.createChart(container, {
       layout: { background: { color: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() }, textColor: getComputedStyle(document.documentElement).getPropertyValue('--fg').trim() },
       grid: { vertLines: { color: 'rgba(255,255,255,0.06)'}, horzLines: { color: 'rgba(255,255,255,0.06)'} },
       timeScale: { timeVisible: true, secondsVisible: true, borderColor: 'rgba(255,255,255,0.12)' },
       rightPriceScale: { borderColor: 'rgba(255,255,255,0.12)' },
-      crosshair: { mode: LightweightCharts.CrosshairMode.Magnet },
+      crosshair: { mode: window.LightweightCharts ? LightweightCharts.CrosshairMode.Magnet : 0 },
       autoSize: true,
-    });
+    }) : null;
 
-    const candleSeries = chart.addCandlestickSeries();
-    const smaSeries = chart.addLineSeries({ lineWidth: 2 });
-    const emaSeries = chart.addLineSeries({ lineWidth: 2 });
+    if(!chart){
+      setStatus('échec initial — recharge la page');
+    }
+
+    const candleSeries = chart ? chart.addCandlestickSeries() : null;
+    const smaSeries = chart ? chart.addLineSeries({ lineWidth: 2 }) : null;
+    const emaSeries = chart ? chart.addLineSeries({ lineWidth: 2 }) : null;
 
     const smaPeriod = 20;
     const emaPeriod = 50;
@@ -132,7 +156,7 @@
         candleSeries.update(last);
       } else {
         candles.push(bar);
-        candleSeries.update(bar);
+        if(candleSeries) candleSeries.update(bar);
       }
 
       const sma = calcSMA(bar.close);
@@ -142,9 +166,9 @@
         const pt = { time: bar.time, value: +sma.toFixed(2) };
         if (smaValues.length && smaValues[smaValues.length-1].time === bar.time) {
           smaValues[smaValues.length-1] = pt;
-          smaSeries.update(pt);
+          if(smaSeries) smaSeries.update(pt);
         } else {
-          smaValues.push(pt); smaSeries.update(pt);
+          smaValues.push(pt); if(smaSeries) smaSeries.update(pt);
         }
         smaLabel.textContent = `SMA(${smaPeriod}): ${pt.value}`;
       }
@@ -152,9 +176,9 @@
         const pt = { time: bar.time, value: +ema.toFixed(2) };
         if (emaValues.length && emaValues[emaValues.length-1].time === bar.time) {
           emaValues[emaValues.length-1] = pt;
-          emaSeries.update(pt);
+          if(emaSeries) emaSeries.update(pt);
         } else {
-          emaValues.push(pt); emaSeries.update(pt);
+          emaValues.push(pt); if(emaSeries) emaSeries.update(pt);
         }
         emaLabel.textContent = `EMA(${emaPeriod}): ${pt.value}`;
       }
@@ -178,7 +202,7 @@
         last = close;
         candles.push({ time: t, open, high, low, close });
       }
-      candleSeries.setData(candles);
+      if(candleSeries) candleSeries.setData(candles);
 
       // recalculer SMA/EMA depuis zéro
       closes.length = 0; seed.length = 0; emaPrev = null; smaValues.length = 0; emaValues.length = 0;
@@ -188,8 +212,8 @@
         if (sma !== null) smaValues.push({ time:c.time, value:+sma.toFixed(2) });
         if (ema !== null) emaValues.push({ time:c.time, value:+ema.toFixed(2) });
       });
-      if (smaValues.length) smaSeries.setData(smaValues);
-      if (emaValues.length) emaSeries.setData(emaValues);
+      if (smaValues.length) if(smaSeries) smaSeries.setData(smaValues);
+      if (emaValues.length) if(emaSeries) emaSeries.setData(emaValues);
 
       const lastC = candles[candles.length-1];
       priceLabel.textContent = `Dernier: ${lastC.close}`;
@@ -289,7 +313,7 @@
     function resetAll() {
       stopFeeds();
       candles.length = 0; smaValues.length = 0; emaValues.length = 0; closes.length = 0; seed.length = 0; emaPrev = null;
-      candleSeries.setData([]); smaSeries.setData([]); emaSeries.setData([]);
+      if(candleSeries) candleSeries.setData([]); if(smaSeries) smaSeries.setData([]); if(emaSeries) emaSeries.setData([]);
       seedHistory();
       const mode = document.getElementById('dataSource').value;
       const symbol = document.getElementById('symbol').value || 'btcusdt';
@@ -300,18 +324,23 @@
     }
 
     document.getElementById('dataSource').addEventListener('change', () => {});
-    document.getElementById('reset').addEventListener('click', resetAll);
+    document.getElementById('reset').addEventListener('click', function(){
+      setStatus('initialisation…');
+      try { resetAll(); setStatus('en cours'); } catch(e){ console.error(e); setStatus('erreur: '+(e.message||e)); }
+    });
 
     // Boot par défaut: historique + simulation
-    seedHistory();
-    startSimulatedFeed();
+    try {
+      if(chart){
+        seedHistory();
+        startSimulatedFeed();
+        setStatus('simulation active');
+      } else {
+        setStatus('Lightweight Charts non disponible');
+      }
+    } catch(e){ console.error(e); setStatus('erreur boot: '+(e.message||e)); }
 
-    // === NOTE: Utiliser le Charting Library officiel de TradingView ===
-    // - Le Charting Library (différent de Lightweight Charts) offre études/indicateurs intégrés, dessin, multi-charts.
-    // - Il nécessite une licence (gratuite pour non-commercial, commerciale sinon) et un accès par domaine autorisé.
-    // - Vous devrez fournir un "Datafeed" (UDF) côté client/serveur pour injecter vos prix (cf. documentation officielle).
-    // - GitHub Pages convient pour héberger les assets statiques. Les WebSockets (comme Binance) passent sans CORS.
-    // - Pour intégrer un graphique TradingView prêt à l'emploi avec indicateurs, vous pouvez aussi utiliser l'iframe "Advanced Real-Time Chart" widget.
+    // Aide: si le graphique n'apparaît pas, vérifiez la console (F12) et la politique CSP.
   </script>
 </body>
 </html>
