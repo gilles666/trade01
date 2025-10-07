@@ -40,7 +40,7 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>Graphique live + SMA/EMA (Lightweight Charts) v2</h1>
+      <h1>Graphique live + SMA/EMA (Lightweight Charts)v4</h1>
       <div class="row">
         <label>
           Source de données :
@@ -88,25 +88,31 @@
     const statusEl = document.getElementById('status');
     function setStatus(txt){ if(statusEl) statusEl.textContent = 'Statut: '+txt; }
 
-    if (!window.LightweightCharts) {
-      setStatus('librairie non chargée…');
+    // === Ajout: initialisation paresseuse du chart quand la librairie est prête ===
+    let chart = null, candleSeries = null, smaSeries = null, emaSeries = null;
+    function ensureChart(){
+      if (chart) return true;
+      if (!window.LightweightCharts) return false;
+      try {
+        chart = LightweightCharts.createChart(container, {
+          layout: { background: { color: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() }, textColor: getComputedStyle(document.documentElement).getPropertyValue('--fg').trim() },
+          grid: { vertLines: { color: 'rgba(255,255,255,0.06)'}, horzLines: { color: 'rgba(255,255,255,0.06)'} },
+          timeScale: { timeVisible: true, secondsVisible: true, borderColor: 'rgba(255,255,255,0.12)' },
+          rightPriceScale: { borderColor: 'rgba(255,255,255,0.12)' },
+          crosshair: { mode: LightweightCharts.CrosshairMode.Magnet },
+          autoSize: true,
+        });
+        candleSeries = chart.addCandlestickSeries();
+        smaSeries = chart.addLineSeries({ lineWidth: 2 });
+        emaSeries = chart.addLineSeries({ lineWidth: 2 });
+        setStatus('lib chargée, graphique prêt');
+        return true;
+      } catch(e){ console.error(e); setStatus('erreur init chart: '+(e.message||e)); return false; }
     }
-    const chart = window.LightweightCharts ? LightweightCharts.createChart(container, {
-      layout: { background: { color: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() }, textColor: getComputedStyle(document.documentElement).getPropertyValue('--fg').trim() },
-      grid: { vertLines: { color: 'rgba(255,255,255,0.06)'}, horzLines: { color: 'rgba(255,255,255,0.06)'} },
-      timeScale: { timeVisible: true, secondsVisible: true, borderColor: 'rgba(255,255,255,0.12)' },
-      rightPriceScale: { borderColor: 'rgba(255,255,255,0.12)' },
-      crosshair: { mode: window.LightweightCharts ? LightweightCharts.CrosshairMode.Magnet : 0 },
-      autoSize: true,
-    }) : null;
 
-    if(!chart){
-      setStatus('échec initial — recharge la page');
-    }
+    window.__onLWCLoaded = function(){ setStatus('lib chargée'); ensureChart(); }
 
-    const candleSeries = chart ? chart.addCandlestickSeries() : null;
-    const smaSeries = chart ? chart.addLineSeries({ lineWidth: 2 }) : null;
-    const emaSeries = chart ? chart.addLineSeries({ lineWidth: 2 }) : null;
+    // (remplacé par ensureChart)
 
     const smaPeriod = 20;
     const emaPeriod = 50;
@@ -311,6 +317,7 @@
 
     // === 4) UI ===
     function resetAll() {
+      if (!ensureChart()) { setStatus('lib non chargée'); return; }
       stopFeeds();
       candles.length = 0; smaValues.length = 0; emaValues.length = 0; closes.length = 0; seed.length = 0; emaPrev = null;
       if(candleSeries) candleSeries.setData([]); if(smaSeries) smaSeries.setData([]); if(emaSeries) emaSeries.setData([]);
@@ -330,15 +337,16 @@
     });
 
     // Boot par défaut: historique + simulation
-    try {
-      if(chart){
-        seedHistory();
-        startSimulatedFeed();
-        setStatus('simulation active');
+    function boot(){
+      if (ensureChart()) {
+        try { seedHistory(); startSimulatedFeed(); setStatus('simulation active'); }
+        catch(e){ console.error(e); setStatus('erreur boot: '+(e.message||e)); }
       } else {
-        setStatus('Lightweight Charts non disponible');
+        setStatus('en attente de la librairie…');
+        setTimeout(boot, 250);
       }
-    } catch(e){ console.error(e); setStatus('erreur boot: '+(e.message||e)); }
+    }
+    boot();
 
     // Aide: si le graphique n'apparaît pas, vérifiez la console (F12) et la politique CSP.
   </script>
