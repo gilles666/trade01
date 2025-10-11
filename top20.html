@@ -2,60 +2,35 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Top 20 des hausses crypto (24 h)</title>
+  <title>Top 20 des hausses crypto (24 h) – Confiance</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    /* ---------- Styles simples & responsives ---------- */
+    /* ---------- Styles ---------- */
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      background: #f7f9fc;
-      margin: 0;
-      padding: 1rem;
-      color: #333;
+      background:#f7f9fc; margin:0; padding:1rem; color:#333;
     }
-    h1 {
-      text-align: center;
-      margin-bottom: 1rem;
+    h1{ text-align:center; margin-bottom:1rem; }
+    #lastUpdate{ text-align:center; font-size:.85rem; color:#666; margin-bottom:.5rem; }
+    table{
+      width:100%; border-collapse:collapse;
+      background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.1);
     }
-    #lastUpdate {
-      text-align: center;
-      font-size: .85rem;
-      color: #666;
-      margin-bottom: .5rem;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: #fff;
-      box-shadow: 0 2px 8px rgba(0,0,0,.1);
-    }
-    th, td {
-      padding: .6rem .8rem;
-      text-align: left;
-    }
-    thead {
-      background: #eaeff5;
-    }
-    tbody tr:nth-child(even) {background:#f5f8fd}
-    .price, .change {text-align: right;}
-    .change.positive {color:#0a8f08}
-    .change.negative {color:#d00}
-    .coin-img {
-      width: 20px;
-      height: 20px;
-      vertical-align: middle;
-      margin-right: .4rem;
-      border-radius: 50%;
-    }
-    a {color:inherit; text-decoration:none;}
-    a:hover {text-decoration:underline;}
-    @media (max-width:600px) {
-      table {font-size:.9rem;}
-    }
+    th, td{ padding:.6rem .8rem; text-align:left; }
+    thead{ background:#eaeff5; }
+    tbody tr:nth-child(even){background:#f5f8fd}
+    .price, .change, .conf{ text-align:right; }
+    .change.positive{color:#0a8f08}
+    .change.negative{color:#d00}
+    .conf{font-weight:600;}
+    .coin-img{ width:20px; height:20px; vertical-align:middle; margin-right:.4rem; border-radius:50%; }
+    a{color:inherit; text-decoration:none;}
+    a:hover{ text-decoration:underline; }
+    @media (max-width:600px){ table{font-size:.9rem;} }
   </style>
 </head>
 <body>
-  <h1>Top 20 des hausses (24 h) v1</h1>
+  <h1>Top 20 des hausses (24 h) – Confiance</h1>
   <div id="lastUpdate"></div>
   <table id="cryptoTable">
     <thead>
@@ -64,108 +39,179 @@
         <th>Nom</th>
         <th class="price">Prix (USD)</th>
         <th class="change">Δ 24 h %</th>
+        <th class="conf">Confiance %</th>
       </tr>
     </thead>
     <tbody></tbody>
   </table>
 
   <script>
-    // -------------------------------------------------
-    // 1️⃣ Configuration
-    // -------------------------------------------------
-    const API_URL = 'https://api.coingecko.com/api/v3/coins/markets' +
-                    '?vs_currency=usd' +
-                    '&order=market_cap_desc' +
-                    '&per_page=250' +          // enough to get the top 20 winners
-                    '&page=1' +
-                    '&price_change_percentage=24h';
+    /* -------------------------------------------------
+       1️⃣ Configuration
+       ------------------------------------------------- */
+    const COINGECKO_URL = 'https://api.coingecko.com/api/v3/coins/markets' +
+                         '?vs_currency=usd&order=market_cap_desc' +
+                         '&per_page=250&page=1&price_change_percentage=24h';
+    const COINBASE_STATS = (symbol) =>
+      `https://api.exchange.coinbase.com/products/${symbol}-USD/stats`;
 
-    const REFRESH_MS = 5 * 60 * 1000;   // 5 minutes
+    const REFRESH_MS = 5 * 60 * 1000;   // 5 minutes
 
-    // -------------------------------------------------
-    // 2️⃣ Fonction principale : récupérer & afficher
-    // -------------------------------------------------
+    // Mapping simplifié des symboles CoinGecko → symboles Coinbase
+    // (la plupart des grands tokens utilisent le même ticker)
+    const COINBASE_SUPPORTED = new Set([
+      'BTC','ETH','LTC','BCH','EOS','XRP','LINK','UNI','DOGE','DOT',
+      'SOL','ADA','MATIC','ATOM','XLM','ALGO','FIL','XTZ','THETA','VET',
+      // vous pouvez ajouter d’autres tickers si besoin
+    ]);
+
+    /* -------------------------------------------------
+       2️⃣ Fonction principale
+       ------------------------------------------------- */
     async function loadTop20() {
       try {
-        const res = await fetch(API_URL);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        // ---- 2.1 ---- Récupérer les données CoinGecko
+        const cgResp = await fetch(COINGECKO_URL);
+        if (!cgResp.ok) throw new Error(`CoinGecko ${cgResp.status}`);
+        const cgData = await cgResp.json();
 
-        // garder seulement les coins avec un pourcentage non nul
-        const filtered = data.filter(c => c.price_change_percentage_24h !== null);
+        // garder uniquement les coins avec %24h non nul
+        const filtered = cgData.filter(c => c.price_change_percentage_24h !== null);
 
-        // trier décroissant sur la hausse
-        filtered.sort((a, b) =>
-          b.price_change_percentage_24h - a.price_change_percentage_24h
-        );
+        // trier par hausse décroissante
+        filtered.sort((a,b)=> b.price_change_percentage_24h - a.price_change_percentage_24h);
 
-        // 20 premiers
-        const top20 = filtered.slice(0, 20);
+        // les 20 premiers
+        const top20 = filtered.slice(0,20);
 
-        // ------- Mettre à jour le tableau -------
+        // ---- 2.2 ---- Pour chaque coin, récupérer le volume Coinbase (si dispo)
+        const statsPromises = top20.map(async coin => {
+          const symbol = coin.symbol.toUpperCase();
+
+          if (!COINBASE_SUPPORTED.has(symbol)) {
+            // Coin non listé sur Coinbase → on retourne null
+            return null;
+          }
+          try {
+            const resp = await fetch(COINBASE_STATS(symbol));
+            if (!resp.ok) throw new Error(`Coinbase ${resp.status}`);
+            const json = await resp.json();
+            // json.volume = volume en base‑currency (USD)
+            return {symbol, volume: parseFloat(json.volume)};
+          } catch (e) {
+            console.warn(`Pas de stats Coinbase pour ${symbol}:`, e);
+            return null;
+          }
+        });
+
+        const statsArray = await Promise.all(statsPromises);
+        // créer un map symbol → volume
+        const volumeMap = {};
+        statsArray.forEach(s => {
+          if (s) volumeMap[s.symbol] = s.volume;
+        });
+
+        // ---- 2.3 ---- Calcul du score de confiance
+        // 1) normaliser le % de hausse
+        const maxChange = Math.max(...top20.map(c=>c.price_change_percentage_24h));
+        const minChange = Math.min(...top20.map(c=>c.price_change_percentage_24h));
+        // 2) normaliser le volume (sur les coins qui ont un volume Coinbase)
+        const volumes = Object.values(volumeMap);
+        const maxVol = volumes.length ? Math.max(...volumes) : 0;
+
+        // fonction utilitaire de normalisation 0‑100
+        const norm = (val, min, max) => {
+          if (max===min) return 0;
+          return ((val - min) / (max - min)) * 100;
+        };
+
+        // ---- 2.4 ---- Construction du tableau HTML
         const tbody = document.querySelector('#cryptoTable tbody');
-        tbody.innerHTML = '';   // reset
+        tbody.innerHTML = '';
 
         top20.forEach((coin, idx) => {
           const tr = document.createElement('tr');
 
-          // 1️⃣ Rang
+          // Rang
           const tdRank = document.createElement('td');
-          tdRank.textContent = idx + 1;
+          tdRank.textContent = idx+1;
           tr.appendChild(tdRank);
 
-          // 2️⃣ Nom + icône
+          // Nom + icône
           const tdName = document.createElement('td');
           const img = document.createElement('img');
           img.src = coin.image;
           img.alt = coin.name;
-          img.className = 'coin-img';
+          img.className='coin-img';
           const a = document.createElement('a');
           a.href = `https://www.coingecko.com/en/coins/${coin.id}`;
-          a.target = '_blank';
-          a.rel = 'noopener';
+          a.target='_blank';
+          a.rel='noopener';
           a.textContent = `${coin.name} (${coin.symbol.toUpperCase()})`;
           tdName.appendChild(img);
           tdName.appendChild(a);
           tr.appendChild(tdName);
 
-          // 3️⃣ Prix
+          // Prix
           const tdPrice = document.createElement('td');
-          tdPrice.className = 'price';
-          tdPrice.textContent = coin.current_price.toLocaleString(undefined, {
-            style: 'currency',
-            currency: 'USD',
-            maximumFractionDigits: 2
+          tdPrice.className='price';
+          tdPrice.textContent = coin.current_price.toLocaleString(undefined,{
+            style:'currency',currency:'USD',maximumFractionDigits:2
           });
           tr.appendChild(tdPrice);
 
-          // 4️⃣ Variation 24h
+          // Variation 24 h
           const tdChange = document.createElement('td');
-          tdChange.className = 'change';
+          tdChange.className='change';
           const change = coin.price_change_percentage_24h;
           tdChange.textContent = `${change.toFixed(2)}%`;
-          tdChange.classList.add(change >= 0 ? 'positive' : 'negative');
+          tdChange.classList.add(change>=0?'positive':'negative');
           tr.appendChild(tdChange);
+
+          // ---------- Confiance ----------
+          const tdConf = document.createElement('td');
+          tdConf.className='conf';
+
+          // Si le coin n’est pas sur Coinbase → on indique “N/A”
+          const volume = volumeMap[coin.symbol.toUpperCase()] ?? null;
+          if (volume===null) {
+            tdConf.textContent='N/A';
+            tdConf.style.color='#999';
+          } else {
+            // normalisations
+            const normChange = norm(change, minChange, maxChange); // 0‑100
+            const normVol    = maxVol ? (volume / maxVol) * 100 : 0; // 0‑100
+
+            // poids 70 % change, 30 % volume
+            const confidence = 0.7*normChange + 0.3*normVol;
+            const confRounded = Math.round(confidence);
+            tdConf.textContent = confRounded + '%';
+            // couleur verte si >70, orange 40‑70, rouge <40
+            if (confRounded >= 70) tdConf.style.color='#0a8f08';
+            else if (confRounded >= 40) tdConf.style.color='#c77000';
+            else tdConf.style.color='#d00';
+          }
+          tr.appendChild(tdConf);
 
           tbody.appendChild(tr);
         });
 
-        // ------- Date de mise à jour -------
+        // ---- 2.5 ---- Mise à jour du timestamp
         const now = new Date();
         document.getElementById('lastUpdate')
                 .textContent = `Dernière mise à jour : ${now.toLocaleTimeString()}`;
-      } catch (e) {
-        console.error(e);
+      } catch (err) {
+        console.error(err);
         document.getElementById('lastUpdate')
-                .textContent = `Erreur lors du chargement des données (${e.message})`;
+                .textContent = `Erreur de chargement (${err.message})`;
       }
     }
 
-    // -------------------------------------------------
-    // 3️⃣ Lancer le premier chargement & le rafraîchissement
-    // -------------------------------------------------
-    loadTop20();                               // au démarrage
-    setInterval(loadTop20, REFRESH_MS);        // toutes les 5 min
+    /* -------------------------------------------------
+       3️⃣ Démarrage + rafraîchissement
+       ------------------------------------------------- */
+    loadTop20();                 // au premier affichage
+    setInterval(loadTop20, REFRESH_MS); // toutes les 5 min
   </script>
 </body>
 </html>
