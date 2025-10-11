@@ -1,217 +1,246 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Top 20 des hausses crypto (24 h) – Confiance</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    /* ---------- Styles ---------- */
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background:#f7f9fc; margin:0; padding:1rem; color:#333;
-    }
-    h1{ text-align:center; margin-bottom:1rem; }
-    #lastUpdate{ text-align:center; font-size:.85rem; color:#666; margin-bottom:.5rem; }
-    table{
-      width:100%; border-collapse:collapse;
-      background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.1);
-    }
-    th, td{ padding:.6rem .8rem; text-align:left; }
-    thead{ background:#eaeff5; }
-    tbody tr:nth-child(even){background:#f5f8fd}
-    .price, .change, .conf{ text-align:right; }
-    .change.positive{color:#0a8f08}
-    .change.negative{color:#d00}
-    .conf{font-weight:600;}
-    .coin-img{ width:20px; height:20px; vertical-align:middle; margin-right:.4rem; border-radius:50%; }
-    a{color:inherit; text-decoration:none;}
-    a:hover{ text-decoration:underline; }
-    @media (max-width:600px){ table{font-size:.9rem;} }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Top 20 Coinbase — % hausse 24h + Confiance</title>
+<style>
+:root{--bg:#0f1220;--card:#171a2b;--text:#e8eaf6;--muted:#9aa0b4;--green:#3ddc97;--red:#ff6b6b;--accent:#7c8cff;--border:#232643}
+*{box-sizing:border-box} body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#0e1120,#0a0d17 60%);color:var(--text);padding:24px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px} h1{font-size:20px;margin:0}
+.pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted)} .btn{border:1px solid var(--border);background:var(--card);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
+.wrap{background:rgba(23,26,43,.6);backdrop-filter:saturate(1.2) blur(6px);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+table{width:100%;border-collapse:separate;border-spacing:0} thead th{text-align:left;font-size:12px;letter-spacing:.02em;color:var(--muted);padding:12px 14px;background:rgba(124,140,255,.06);position:sticky;top:0;z-index:1}
+tbody td{padding:10px 14px;border-top:1px solid var(--border)} tbody tr:hover{background:rgba(124,140,255,.05)}
+.num{font-variant-numeric:tabular-nums;text-align:right} .sym{color:var(--muted)} .pos{color:var(--green);font-weight:600} .neg{color:var(--red);font-weight:600}
+.badge{padding:2px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--muted)}
+@media(max-width:700px){.hide-sm{display:none} body{padding:16px} h1{font-size:18px} tbody td, thead th{padding:10px}}
+</style>
 </head>
 <body>
-  <h1>Top 20 des hausses (24 h) – Confiance</h1>
-  <div id="lastUpdate"></div>
-  <table id="cryptoTable">
+<header>
+  <h1>Top 20 — % de hausse (24h) · Coinbase v1</h1>
+  <span id="lastUpdate" class="pill">Dernière maj: —</span>
+  <span id="nextIn" class="pill">Prochaine maj dans: —</span>
+  <button id="refreshBtn" class="btn">↻ Actualiser</button>
+</header>
+
+<div class="wrap">
+  <table>
     <thead>
       <tr>
         <th>#</th>
-        <th>Nom</th>
-        <th class="price">Prix (USD)</th>
-        <th class="change">Δ 24 h %</th>
-        <th class="conf">Confiance %</th>
+        <th>Actif</th>
+        <th class="hide-sm">Prix</th>
+        <th class="hide-sm">Cap. (si dispo)</th>
+        <th class="hide-sm">Vol 24h</th>
+        <th class="num">% 24h</th>
+        <th class="num">% Confiance</th>
       </tr>
     </thead>
-    <tbody></tbody>
+    <tbody id="tbody">
+      <tr><td colspan="7" style="padding:18px;color:#9aa0b4">Chargement…</td></tr>
+    </tbody>
   </table>
+</div>
 
-  <script>
-    /* -------------------------------------------------
-       1️⃣ Configuration
-       ------------------------------------------------- */
-    const COINGECKO_URL = 'https://api.coingecko.com/api/v3/coins/markets' +
-                         '?vs_currency=usd&order=market_cap_desc' +
-                         '&per_page=250&page=1&price_change_percentage=24h';
-    const COINBASE_STATS = (symbol) =>
-      `https://api.exchange.coinbase.com/products/${symbol}-USD/stats`;
+<footer style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:var(--muted)">
+  <div>Source : Coinbase Exchange APIs (produits USD/USDT)</div>
+  <div><small>Auto-refresh: 5 min</small></div>
+</footer>
 
-    const REFRESH_MS = 5 * 60 * 1000;   // 5 minutes
+<script>
+(async function(){
+  const EX = 'https://api.exchange.coinbase.com';
+  const tbody = document.getElementById('tbody');
+  const lastUpdate = document.getElementById('lastUpdate');
+  const nextIn = document.getElementById('nextIn');
+  const refreshBtn = document.getElementById('refreshBtn');
 
-    // Mapping simplifié des symboles CoinGecko → symboles Coinbase
-    // (la plupart des grands tokens utilisent le même ticker)
-    const COINBASE_SUPPORTED = new Set([
-      'BTC','ETH','LTC','BCH','EOS','XRP','LINK','UNI','DOGE','DOT',
-      'SOL','ADA','MATIC','ATOM','XLM','ALGO','FIL','XTZ','THETA','VET',
-      // vous pouvez ajouter d’autres tickers si besoin
-    ]);
+  // ===== Formatters
+  const fmtUSD = v => isFinite(+v)? new Intl.NumberFormat('fr-FR',{style:'currency',currency:'USD',maximumFractionDigits:(+v>=1?2:6),minimumFractionDigits:(+v>=1?2:4)}).format(+v):'—';
+  const fmtCompact = v => isFinite(+v)? new Intl.NumberFormat('fr-FR',{notation:'compact',maximumFractionDigits:2}).format(+v):'—';
+  const fmtPct = v => isFinite(+v)? (+v).toFixed(2)+' %':'—';
+  const toLocal = t => new Date(t).toLocaleString('fr-FR',{hour12:false});
 
-    /* -------------------------------------------------
-       2️⃣ Fonction principale
-       ------------------------------------------------- */
-    async function loadTop20() {
-      try {
-        // ---- 2.1 ---- Récupérer les données CoinGecko
-        const cgResp = await fetch(COINGECKO_URL);
-        if (!cgResp.ok) throw new Error(`CoinGecko ${cgResp.status}`);
-        const cgData = await cgResp.json();
+  // ===== Refresh cadence
+  let timer=null, countdown=0;
+  function startCountdown(sec=300){
+    countdown=sec; updateCountdown();
+    if (timer) clearInterval(timer);
+    timer=setInterval(()=>{ countdown--; updateCountdown(); if(countdown<=0){clearInterval(timer); load();} },1000);
+  }
+  function updateCountdown(){
+    const m=Math.floor(countdown/60), s=String(countdown%60).padStart(2,'0');
+    nextIn.textContent=`Prochaine maj dans: ${m}:${s}`;
+  }
 
-        // garder uniquement les coins avec %24h non nul
-        const filtered = cgData.filter(c => c.price_change_percentage_24h !== null);
+  // ===== Helpers HTTP (petit throttle pour /stats et /candles)
+  const sleep = ms => new Promise(r=>setTimeout(r,ms));
+  async function fetchJSON(url, init={}) {
+    const res = await fetch(url, { ...init, headers: { 'Accept': 'application/json', ...(init.headers||{}) }, cache:'no-store' });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText} @ ${url}`);
+    return res.json();
+  }
 
-        // trier par hausse décroissante
-        filtered.sort((a,b)=> b.price_change_percentage_24h - a.price_change_percentage_24h);
+  // ===== Confidence model (heuristique 0..100)
+  function confidencePct(features){
+    const {mom60, volX, trendGreen, proxHigh} = features; // chacun 0..1
+    const clamp = (x)=> Math.max(0, Math.min(1, x));
+    const score =
+      0.35*clamp(mom60) +
+      0.30*clamp(volX) +
+      0.20*clamp(trendGreen) +
+      0.15*clamp(proxHigh);
+    return Math.round(score*100);
+  }
 
-        // les 20 premiers
-        const top20 = filtered.slice(0,20);
+  async function load(){
+    refreshBtn.disabled = true;
+    try{
+      // 1) Liste des produits (pairs) -> on garde USD & USDT, status 'online'
+      const products = await fetchJSON(`${EX}/products`);
+      const spot = products.filter(p =>
+        (p.status === 'online' || p.status === 'online_trading') &&
+        (p.quote_currency === 'USD' || p.quote_currency === 'USDT') &&
+        !p.trading_disabled && !p.cancel_only && !p.post_only
+      );
 
-        // ---- 2.2 ---- Pour chaque coin, récupérer le volume Coinbase (si dispo)
-        const statsPromises = top20.map(async coin => {
-          const symbol = coin.symbol.toUpperCase();
+      // 2) Volume résumé pour tous (24h & 30j) en 1 requête
+      //    -> map {product_id: {volume_24h, volume_30d}}
+      let volMap = {};
+      try{
+        const volSum = await fetchJSON(`${EX}/products/volume-summary`);
+        for (const row of (volSum||[])) {
+          volMap[row.product_id] = { v24:+row.volume_24h || 0, v30:+row.volume_30day || 0 };
+        }
+      }catch(e){ /* endpoint pas critique pour le tri; on continue */ }
 
-          if (!COINBASE_SUPPORTED.has(symbol)) {
-            // Coin non listé sur Coinbase → on retourne null
-            return null;
-          }
-          try {
-            const resp = await fetch(COINBASE_STATS(symbol));
-            if (!resp.ok) throw new Error(`Coinbase ${resp.status}`);
-            const json = await resp.json();
-            // json.volume = volume en base‑currency (USD)
-            return {symbol, volume: parseFloat(json.volume)};
-          } catch (e) {
-            console.warn(`Pas de stats Coinbase pour ${symbol}:`, e);
-            return null;
-          }
-        });
+      // 3) Récup stats 24h pour calculer % (open->last)
+      //    On limite à 150 meilleures par volume pour réduire la charge, puis on trie
+      const topByVol = spot
+        .map(p => ({...p, v24: (volMap[p.id]?.v24)||0}))
+        .sort((a,b)=> b.v24 - a.v24)
+        .slice(0,150);
 
-        const statsArray = await Promise.all(statsPromises);
-        // créer un map symbol → volume
-        const volumeMap = {};
-        statsArray.forEach(s => {
-          if (s) volumeMap[s.symbol] = s.volume;
-        });
-
-        // ---- 2.3 ---- Calcul du score de confiance
-        // 1) normaliser le % de hausse
-        const maxChange = Math.max(...top20.map(c=>c.price_change_percentage_24h));
-        const minChange = Math.min(...top20.map(c=>c.price_change_percentage_24h));
-        // 2) normaliser le volume (sur les coins qui ont un volume Coinbase)
-        const volumes = Object.values(volumeMap);
-        const maxVol = volumes.length ? Math.max(...volumes) : 0;
-
-        // fonction utilitaire de normalisation 0‑100
-        const norm = (val, min, max) => {
-          if (max===min) return 0;
-          return ((val - min) / (max - min)) * 100;
-        };
-
-        // ---- 2.4 ---- Construction du tableau HTML
-        const tbody = document.querySelector('#cryptoTable tbody');
-        tbody.innerHTML = '';
-
-        top20.forEach((coin, idx) => {
-          const tr = document.createElement('tr');
-
-          // Rang
-          const tdRank = document.createElement('td');
-          tdRank.textContent = idx+1;
-          tr.appendChild(tdRank);
-
-          // Nom + icône
-          const tdName = document.createElement('td');
-          const img = document.createElement('img');
-          img.src = coin.image;
-          img.alt = coin.name;
-          img.className='coin-img';
-          const a = document.createElement('a');
-          a.href = `https://www.coingecko.com/en/coins/${coin.id}`;
-          a.target='_blank';
-          a.rel='noopener';
-          a.textContent = `${coin.name} (${coin.symbol.toUpperCase()})`;
-          tdName.appendChild(img);
-          tdName.appendChild(a);
-          tr.appendChild(tdName);
-
-          // Prix
-          const tdPrice = document.createElement('td');
-          tdPrice.className='price';
-          tdPrice.textContent = coin.current_price.toLocaleString(undefined,{
-            style:'currency',currency:'USD',maximumFractionDigits:2
-          });
-          tr.appendChild(tdPrice);
-
-          // Variation 24 h
-          const tdChange = document.createElement('td');
-          tdChange.className='change';
-          const change = coin.price_change_percentage_24h;
-          tdChange.textContent = `${change.toFixed(2)}%`;
-          tdChange.classList.add(change>=0?'positive':'negative');
-          tr.appendChild(tdChange);
-
-          // ---------- Confiance ----------
-          const tdConf = document.createElement('td');
-          tdConf.className='conf';
-
-          // Si le coin n’est pas sur Coinbase → on indique “N/A”
-          const volume = volumeMap[coin.symbol.toUpperCase()] ?? null;
-          if (volume===null) {
-            tdConf.textContent='N/A';
-            tdConf.style.color='#999';
-          } else {
-            // normalisations
-            const normChange = norm(change, minChange, maxChange); // 0‑100
-            const normVol    = maxVol ? (volume / maxVol) * 100 : 0; // 0‑100
-
-            // poids 70 % change, 30 % volume
-            const confidence = 0.7*normChange + 0.3*normVol;
-            const confRounded = Math.round(confidence);
-            tdConf.textContent = confRounded + '%';
-            // couleur verte si >70, orange 40‑70, rouge <40
-            if (confRounded >= 70) tdConf.style.color='#0a8f08';
-            else if (confRounded >= 40) tdConf.style.color='#c77000';
-            else tdConf.style.color='#d00';
-          }
-          tr.appendChild(tdConf);
-
-          tbody.appendChild(tr);
-        });
-
-        // ---- 2.5 ---- Mise à jour du timestamp
-        const now = new Date();
-        document.getElementById('lastUpdate')
-                .textContent = `Dernière mise à jour : ${now.toLocaleTimeString()}`;
-      } catch (err) {
-        console.error(err);
-        document.getElementById('lastUpdate')
-                .textContent = `Erreur de chargement (${err.message})`;
+      // Petit pool pour ne pas heurter les limites (≈ 5 req/s)
+      async function getStatsBatch(list){
+        const out=[];
+        for (const p of list){
+          try{
+            const s = await fetchJSON(`${EX}/products/${encodeURIComponent(p.id)}/stats`);
+            const open = +s.open, last= +s.last, high= +s.high, low= +s.low;
+            const changePct = (isFinite(open) && open>0 && isFinite(last)) ? ((last-open)/open)*100 : NaN;
+            out.push({product:p, changePct, last, high, low});
+          }catch(e){ /* ignore */}
+          await sleep(180); // ~5.5 req/s
+        }
+        return out;
       }
-    }
 
-    /* -------------------------------------------------
-       3️⃣ Démarrage + rafraîchissement
-       ------------------------------------------------- */
-    loadTop20();                 // au premier affichage
-    setInterval(loadTop20, REFRESH_MS); // toutes les 5 min
-  </script>
+      const stats = await getStatsBatch(topByVol);
+
+      // 4) Tri par % 24h décroissant puis top 28 (on en prend 28 pour amortir les exclusions)
+      const movers = stats
+        .filter(x => isFinite(x.changePct) && x.changePct > 0)
+        .sort((a,b)=> b.changePct - a.changePct)
+        .slice(0,28);
+
+      // 5) Pour chaque des ~28, on calcule le % de confiance via 12 bougies 5min (~1h)
+      async function enrichWithConfidence(item){
+        const pid = item.product.id;
+        let mom60=0, volX=0, trendGreen=0, proxHigh=0;
+
+        // Momentum 60 min, tendance récente (bougies 5m)
+        try{
+          const now = Date.now();
+          const end = new Date(now).toISOString();
+          const start = new Date(now - 65*60*1000).toISOString(); // 65 min pour 12-13 bougies
+          const candles = await fetchJSON(`${EX}/products/${encodeURIComponent(pid)}/candles?granularity=300&start=${start}&end=${end}`);
+          // candles: [[time, low, high, open, close, volume], ...] (ordre antéchronologique)
+          const cs = (candles||[]).sort((a,b)=> a[0]-b[0]); // chrono
+          if (cs.length>=2){
+            const first = cs[0], last = cs[cs.length-1];
+            const p0 = +first[3]; // open
+            const p1 = +last[4];  // close
+            mom60 = isFinite(p0)&&p0>0&&isFinite(p1)? Math.max(-1, Math.min(1, (p1-p0)/p0*5)) : 0; // amplif modérée
+            const greens = cs.filter(c => (+c[4])>(+c[3])).length;
+            trendGreen = greens / cs.length;
+          }
+        }catch(e){ /* pas bloquant */ }
+
+        // Volume multiple vs moyenne quotidienne 30j
+        const vm = volMap[item.product.id];
+        if (vm && vm.v30>0){
+          const avgDaily = vm.v30/30;
+          volX = Math.min(1, (vm.v24/avgDaily)/3); // 1 si >= 3× la moyenne
+        }
+
+        // Proximité du plus haut 24h
+        if (isFinite(item.high) && isFinite(item.low) && item.high>item.low && isFinite(item.last)){
+          const rng = item.high - item.low;
+          proxHigh = Math.max(0, Math.min(1, (item.last - item.low)/rng)); // 1 = proche du haut
+        }
+
+        const conf = confidencePct({mom60, volX, trendGreen, proxHigh});
+        return { ...item, conf, vol24: vm?.v24||0, vol30: vm?.v30||0 };
+      }
+
+      const enriched = [];
+      for (const m of movers){ enriched.push(await enrichWithConfidence(m)); await sleep(120); }
+
+      // 6) Affichage Top 20 final
+      const rows = enriched
+        .sort((a,b)=> b.changePct - a.changePct)
+        .slice(0,20);
+
+      render(rows);
+      lastUpdate.textContent = `Dernière maj: ${toLocal(Date.now())}`;
+      startCountdown(300);
+      refreshBtn.disabled = false;
+
+    }catch(err){
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:18px;color:#ffb4b4">Erreur: ${err.message}. Nouvelle tentative dans 60s…</td></tr>`;
+      startCountdown(60);
+      refreshBtn.disabled = false;
+    }
+  }
+
+  function render(rows){
+    if (!rows.length){ tbody.innerHTML = `<tr><td colspan="7" style="padding:18px;color:#9aa0b4">Aucune donnée</td></tr>`; return; }
+    tbody.innerHTML = rows.map((r,i)=>{
+      const p = r.product;
+      const asset = `${p.base_currency}-${p.quote_currency}`;
+      const pos = r.changePct>=0;
+      const capBadge = `<span class="badge">Spot</span>`;
+      return `
+      <tr>
+        <td>${i+1}</td>
+        <td>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:.7"></div>
+            <div>
+              <div>${p.base_currency} <span class="sym">(${asset})</span> ${capBadge}</div>
+              <div class="sym hide-sm" style="font-size:12px">
+                <a href="https://exchange.coinbase.com/trade/${encodeURIComponent(asset)}" target="_blank" style="color:var(--accent)">Ouvrir sur Coinbase</a>
+              </div>
+            </div>
+          </div>
+        </td>
+        <td class="hide-sm num">${fmtUSD(r.last)}</td>
+        <td class="hide-sm num">—</td>
+        <td class="hide-sm num">${fmtCompact(r.vol24)} <span class="sym">(${(r.vol30? ' / moy.' : '')})</span></td>
+        <td class="num ${pos?'pos':'neg'}">${fmtPct(r.changePct)}</td>
+        <td class="num"><strong>${r.conf} %</strong></td>
+      </tr>`;
+    }).join('');
+  }
+
+  refreshBtn.addEventListener('click', load);
+  document.addEventListener('visibilitychange', ()=>{ if (!document.hidden && countdown < 5) load(); });
+
+  load();
+})();
+</script>
 </body>
 </html>
