@@ -3,23 +3,31 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Top 20 Coinbase — % hausse 24h + Confiance</title>
+<title>Top 20 Coinbase — % hausse 24h + Confiance + Market Cap</title>
 <style>
 :root{--bg:#0f1220;--card:#171a2b;--text:#e8eaf6;--muted:#9aa0b4;--green:#3ddc97;--red:#ff6b6b;--accent:#7c8cff;--border:#232643}
-*{box-sizing:border-box} body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#0e1120,#0a0d17 60%);color:var(--text);padding:24px}
-header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px} h1{font-size:20px;margin:0}
-.pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted)} .btn{border:1px solid var(--border);background:var(--card);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#0e1120,#0a0d17 60%);color:var(--text);padding:24px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px}
+h1{font-size:20px;margin:0}
+.pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
+.btn{border:1px solid var(--border);background:var(--card);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
 .wrap{background:rgba(23,26,43,.6);backdrop-filter:saturate(1.2) blur(6px);border:1px solid var(--border);border-radius:14px;overflow:hidden}
-table{width:100%;border-collapse:separate;border-spacing:0} thead th{text-align:left;font-size:12px;letter-spacing:.02em;color:var(--muted);padding:12px 14px;background:rgba(124,140,255,.06);position:sticky;top:0;z-index:1}
-tbody td{padding:10px 14px;border-top:1px solid var(--border)} tbody tr:hover{background:rgba(124,140,255,.05)}
-.num{font-variant-numeric:tabular-nums;text-align:right} .sym{color:var(--muted)} .pos{color:var(--green);font-weight:600} .neg{color:var(--red);font-weight:600}
+table{width:100%;border-collapse:separate;border-spacing:0}
+thead th{text-align:left;font-size:12px;letter-spacing:.02em;color:var(--muted);padding:12px 14px;background:rgba(124,140,255,.06);position:sticky;top:0;z-index:1}
+tbody td{padding:10px 14px;border-top:1px solid var(--border)}
+tbody tr:hover{background:rgba(124,140,255,.05)}
+.num{font-variant-numeric:tabular-nums;text-align:right}
+.sym{color:var(--muted)}
+.pos{color:var(--green);font-weight:600}
+.neg{color:var(--red);font-weight:600}
 .badge{padding:2px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--muted)}
 @media(max-width:700px){.hide-sm{display:none} body{padding:16px} h1{font-size:18px} tbody td, thead th{padding:10px}}
 </style>
 </head>
 <body>
 <header>
-  <h1>Top 20 — % de hausse (24h) · Coinbase v2</h1>
+  <h1>Top 20 — % de hausse (24h) · Coinbase v3</h1>
   <span id="lastUpdate" class="pill">Dernière maj: —</span>
   <span id="nextIn" class="pill">Prochaine maj dans: —</span>
   <button id="refreshBtn" class="btn">↻ Actualiser</button>
@@ -32,7 +40,7 @@ tbody td{padding:10px 14px;border-top:1px solid var(--border)} tbody tr:hover{ba
         <th>#</th>
         <th>Actif</th>
         <th class="hide-sm">Prix</th>
-        <th class="hide-sm">Cap. (si dispo)</th>
+        <th class="hide-sm">Market Cap</th>
         <th class="hide-sm">Vol 24h</th>
         <th class="num">% 24h</th>
         <th class="num">% Confiance</th>
@@ -45,13 +53,14 @@ tbody td{padding:10px 14px;border-top:1px solid var(--border)} tbody tr:hover{ba
 </div>
 
 <footer style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:var(--muted)">
-  <div>Source : Coinbase Exchange APIs (produits USD/USDT)</div>
+  <div>Sources : Coinbase Exchange (prix/vol.) · CoinCap (market cap)</div>
   <div><small>Auto-refresh: 5 min</small></div>
 </footer>
 
 <script>
 (async function(){
   const EX = 'https://api.exchange.coinbase.com';
+  const COINCAP = 'https://api.coincap.io/v2/assets?limit=2000'; // marketCapUsd + symbol
   const tbody = document.getElementById('tbody');
   const lastUpdate = document.getElementById('lastUpdate');
   const nextIn = document.getElementById('nextIn');
@@ -75,7 +84,7 @@ tbody td{padding:10px 14px;border-top:1px solid var(--border)} tbody tr:hover{ba
     nextIn.textContent=`Prochaine maj dans: ${m}:${s}`;
   }
 
-  // ===== Helpers HTTP (petit throttle pour /stats et /candles)
+  // ===== Helpers HTTP
   const sleep = ms => new Promise(r=>setTimeout(r,ms));
   async function fetchJSON(url, init={}) {
     const res = await fetch(url, { ...init, headers: { 'Accept': 'application/json', ...(init.headers||{}) }, cache:'no-store' });
@@ -95,10 +104,32 @@ tbody td{padding:10px 14px;border-top:1px solid var(--border)} tbody tr:hover{ba
     return Math.round(score*100);
   }
 
+  // ==== Market Cap map from CoinCap (symbol -> marketCapUsd)
+  async function buildMarketCapMap(){
+    try{
+      const data = await fetchJSON(COINCAP);
+      const map = {};
+      for (const a of (data.data||[])){
+        const sym = (a.symbol||'').toUpperCase();
+        const mc = +a.marketCapUsd;
+        if (sym && isFinite(mc)) {
+          // keep the largest market cap if duplicates
+          map[sym] = Math.max(map[sym]||0, mc);
+        }
+      }
+      return map;
+    }catch(e){
+      return {};
+    }
+  }
+
   async function load(){
     refreshBtn.disabled = true;
     try{
-      // 1) Liste des produits (pairs) -> on garde USD & USDT, status 'online'
+      // 0) Market cap map (CoinCap)
+      const mcMapPromise = buildMarketCapMap();
+
+      // 1) Liste des produits (USD/USDT spot actifs)
       const products = await fetchJSON(`${EX}/products`);
       const spot = products.filter(p =>
         (p.status === 'online' || p.status === 'online_trading') &&
@@ -106,91 +137,95 @@ tbody td{padding:10px 14px;border-top:1px solid var(--border)} tbody tr:hover{ba
         !p.trading_disabled && !p.cancel_only && !p.post_only
       );
 
-      // 2) Volume résumé pour tous (24h & 30j) en 1 requête
-      //    -> map {product_id: {volume_24h, volume_30d}}
+      // 2) Volume résumé pour tous (24h & 30j) — pas strictement nécessaire mais utile
       let volMap = {};
       try{
         const volSum = await fetchJSON(`${EX}/products/volume-summary`);
         for (const row of (volSum||[])) {
           volMap[row.product_id] = { v24:+row.volume_24h || 0, v30:+row.volume_30day || 0 };
         }
-      }catch(e){ /* endpoint pas critique pour le tri; on continue */ }
+      }catch(e){ /* optionnel */ }
 
-      // 3) Récup stats 24h pour calculer % (open->last)
-      //    On limite à 150 meilleures par volume pour réduire la charge, puis on trie
+      // 3) Pré-sélection par volume 24h
       const topByVol = spot
         .map(p => ({...p, v24: (volMap[p.id]?.v24)||0}))
         .sort((a,b)=> b.v24 - a.v24)
         .slice(0,150);
 
-      // Petit pool pour ne pas heurter les limites (≈ 5 req/s)
+      // 4) Stats 24h pour calculer % et vol 24h
       async function getStatsBatch(list){
         const out=[];
         for (const p of list){
           try{
             const s = await fetchJSON(`${EX}/products/${encodeURIComponent(p.id)}/stats`);
-            const open = +s.open, last= +s.last, high= +s.high, low= +s.low;
+            const open = +s.open, last= +s.last, high= +s.high, low= +s.low, volBase = +s.volume; // vol base sur 24h
             const changePct = (isFinite(open) && open>0 && isFinite(last)) ? ((last-open)/open)*100 : NaN;
-            out.push({product:p, changePct, last, high, low});
+            // Convertit volume base -> USD (si USDT, approx = USD)
+            const volUsd = isFinite(volBase) && isFinite(last) ? volBase * last : NaN;
+            out.push({product:p, changePct, last, high, low, volBase, volUsd});
           }catch(e){ /* ignore */}
-          await sleep(180); // ~5.5 req/s
+          await sleep(180);
         }
         return out;
       }
-
       const stats = await getStatsBatch(topByVol);
 
-      // 4) Tri par % 24h décroissant puis top 28 (on en prend 28 pour amortir les exclusions)
+      // 5) Tri par % 24h décroissant et sélection
       const movers = stats
         .filter(x => isFinite(x.changePct) && x.changePct > 0)
         .sort((a,b)=> b.changePct - a.changePct)
         .slice(0,28);
 
-      // 5) Pour chaque des ~28, on calcule le % de confiance via 12 bougies 5min (~1h)
-      async function enrichWithConfidence(item){
+      // 6) Enrichir confiance via bougies 5m (~1h)
+      async function enrich(item){
         const pid = item.product.id;
         let mom60=0, volX=0, trendGreen=0, proxHigh=0;
 
-        // Momentum 60 min, tendance récente (bougies 5m)
         try{
           const now = Date.now();
           const end = new Date(now).toISOString();
-          const start = new Date(now - 65*60*1000).toISOString(); // 65 min pour 12-13 bougies
+          const start = new Date(now - 65*60*1000).toISOString();
           const candles = await fetchJSON(`${EX}/products/${encodeURIComponent(pid)}/candles?granularity=300&start=${start}&end=${end}`);
-          // candles: [[time, low, high, open, close, volume], ...] (ordre antéchronologique)
-          const cs = (candles||[]).sort((a,b)=> a[0]-b[0]); // chrono
+          const cs = (candles||[]).sort((a,b)=> a[0]-b[0]);
           if (cs.length>=2){
-            const first = cs[0], last = cs[cs.length-1];
+            const first = cs[0], lastC = cs[cs.length-1];
             const p0 = +first[3]; // open
-            const p1 = +last[4];  // close
-            mom60 = isFinite(p0)&&p0>0&&isFinite(p1)? Math.max(-1, Math.min(1, (p1-p0)/p0*5)) : 0; // amplif modérée
+            const p1 = +lastC[4]; // close
+            mom60 = isFinite(p0)&&p0>0&&isFinite(p1)? Math.max(-1, Math.min(1, (p1-p0)/p0*5)) : 0;
             const greens = cs.filter(c => (+c[4])>(+c[3])).length;
             trendGreen = greens / cs.length;
           }
-        }catch(e){ /* pas bloquant */ }
+        }catch(e){}
 
-        // Volume multiple vs moyenne quotidienne 30j
+        // Volume multiple vs moyenne 30j (si dispo)
         const vm = volMap[item.product.id];
         if (vm && vm.v30>0){
           const avgDaily = vm.v30/30;
-          volX = Math.min(1, (vm.v24/avgDaily)/3); // 1 si >= 3× la moyenne
+          volX = Math.min(1, (vm.v24/avgDaily)/3);
         }
 
         // Proximité du plus haut 24h
         if (isFinite(item.high) && isFinite(item.low) && item.high>item.low && isFinite(item.last)){
           const rng = item.high - item.low;
-          proxHigh = Math.max(0, Math.min(1, (item.last - item.low)/rng)); // 1 = proche du haut
+          proxHigh = Math.max(0, Math.min(1, (item.last - item.low)/rng));
         }
 
         const conf = confidencePct({mom60, volX, trendGreen, proxHigh});
-        return { ...item, conf, vol24: vm?.v24||0, vol30: vm?.v30||0 };
+        return { ...item, conf };
       }
 
       const enriched = [];
-      for (const m of movers){ enriched.push(await enrichWithConfidence(m)); await sleep(120); }
+      for (const m of movers){ enriched.push(await enrich(m)); await sleep(120); }
 
-      // 6) Affichage Top 20 final
-      const rows = enriched
+      // 7) Ajoute Market Cap via CoinCap (par symbole)
+      const mcMap = await mcMapPromise;
+      const withMc = enriched.map(x => ({
+        ...x,
+        marketCapUsd: mcMap[(x.product.base_currency||'').toUpperCase()] || NaN
+      }));
+
+      // 8) Top 20 final
+      const rows = withMc
         .sort((a,b)=> b.changePct - a.changePct)
         .slice(0,20);
 
@@ -212,7 +247,8 @@ tbody td{padding:10px 14px;border-top:1px solid var(--border)} tbody tr:hover{ba
       const p = r.product;
       const asset = `${p.base_currency}-${p.quote_currency}`;
       const pos = r.changePct>=0;
-      const capBadge = `<span class="badge">Spot</span>`;
+      const mc = isFinite(r.marketCapUsd)? fmtCompact(r.marketCapUsd) : '—';
+      const vol = isFinite(r.volUsd)? fmtCompact(r.volUsd) : '—';
       return `
       <tr>
         <td>${i+1}</td>
@@ -220,7 +256,7 @@ tbody td{padding:10px 14px;border-top:1px solid var(--border)} tbody tr:hover{ba
           <div style="display:flex;gap:10px;align-items:center">
             <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:.7"></div>
             <div>
-              <div>${p.base_currency} <span class="sym">(${asset})</span> ${capBadge}</div>
+              <div>${p.base_currency} <span class="sym">(${asset})</span></div>
               <div class="sym hide-sm" style="font-size:12px">
                 <a href="https://exchange.coinbase.com/trade/${encodeURIComponent(asset)}" target="_blank" style="color:var(--accent)">Ouvrir sur Coinbase</a>
               </div>
@@ -228,15 +264,15 @@ tbody td{padding:10px 14px;border-top:1px solid var(--border)} tbody tr:hover{ba
           </div>
         </td>
         <td class="hide-sm num">${fmtUSD(r.last)}</td>
-        <td class="hide-sm num">—</td>
-        <td class="hide-sm num">${fmtCompact(r.vol24)} <span class="sym">(${(r.vol30? ' / moy.' : '')})</span></td>
+        <td class="hide-sm num">${mc}</td>
+        <td class="hide-sm num">${vol}</td>
         <td class="num ${pos?'pos':'neg'}">${fmtPct(r.changePct)}</td>
         <td class="num"><strong>${r.conf} %</strong></td>
       </tr>`;
     }).join('');
   }
 
-  refreshBtn.addEventListener('click', load);
+  document.getElementById('refreshBtn').addEventListener('click', load);
   document.addEventListener('visibilitychange', ()=>{ if (!document.hidden && countdown < 5) load(); });
 
   load();
