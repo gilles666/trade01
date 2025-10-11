@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Top 20 Crypto — % hausse 24h + Confiance</title>
+  <style>
+    :root{
+      --bg:#0f1220; --card:#171a2b; --text:#e8eaf6; --muted:#9aa0b4;
+      --green:#3ddc97; --red:#ff6b6b; --accent:#7c8cff; --border:#232643;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:linear-gradient(180deg,#0e1120, #0a0d17 60%); color:var(--text);
+      padding:24px;
+    }
+    header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px}
+    h1{font-size:20px;margin:0}
+    .pill{padding:6px 10px; border:1px solid var(--border); border-radius:999px; color:var(--muted)}
+    .btn{border:1px solid var(--border); background:var(--card); color:var(--text); padding:8px 12px; border-radius:10px; cursor:pointer}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .wrap{background:rgba(23,26,43,.6); backdrop-filter:saturate(1.2) blur(6px); border:1px solid var(--border); border-radius:14px; overflow:hidden}
+    table{width:100%; border-collapse:separate; border-spacing:0}
+    thead th{ text-align:left; font-size:12px; letter-spacing:.02em; color:var(--muted);
+      padding:12px 14px; background:rgba(124,140,255,.06); position:sticky; top:0; z-index:1 }
+    tbody td{padding:10px 14px; border-top:1px solid var(--border)}
+    tbody tr:hover{background:rgba(124,140,255,.05)}
+    .num{font-variant-numeric:tabular-nums; text-align:right}
+    .sym{color:var(--muted)}
+    .pos{color:var(--green); font-weight:600}
+    .neg{color:var(--red); font-weight:600}
+    .hint{color:var(--muted); font-size:12px}
+    .bar{height:6px;border-radius:6px;background:rgba(124,140,255,.2);overflow:hidden}
+    .bar>span{display:block;height:100%;background:linear-gradient(90deg, #5ef2c1, #7c8cff)}
+    @media (max-width:900px){ .hide-md{display:none} }
+    @media (max-width:700px){
+      .hide-sm{display:none}
+      body{padding:16px} h1{font-size:18px}
+      tbody td, thead th{padding:10px}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Top 20 — % de hausse (24h)</h1>
+    <span id="lastUpdate" class="pill">Dernière maj: —</span>
+    <span id="nextIn" class="pill">Prochaine maj dans: —</span>
+    <button id="refreshBtn" class="btn">↻ Actualiser</button>
+  </header>
+
+  <div class="wrap">
+    <table id="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Actif</th>
+          <th class="hide-sm">Prix</th>
+          <th class="hide-md">Cap. Marché</th>
+          <th class="hide-md">Volume 24h</th>
+          <th class="num">% 24h</th>
+          <th class="num">Confiance %</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="7" style="padding:18px;color:#9aa0b4">Chargement…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="hint">Le score “Confiance %” est <strong>heuristique</strong> (momentum, volatilité, pente, liquidité) — <em>pas</em> un conseil d’investissement.</p>
+
+<script>
+(async function(){
+  const API_ASSETS = 'https://api.coincap.io/v2/assets?limit=500';
+  const tbody = document.getElementById('tbody');
+  const lastUpdate = document.getElementById('lastUpdate');
+  const nextIn = document.getElementById('nextIn');
+  const refreshBtn = document.getElementById('refreshBtn');
+
+  const fmtPrice = v => {
+    const n = Number(v);
+    if (!isFinite(n)) return '—';
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD',
+      minimumFractionDigits: n >= 1 ? 2 : 4, maximumFractionDigits: n >= 1 ? 2 : 6 }).format(n);
+  };
+  const fmtCompact = v => {
+    const n = Number(v);
+    if (!isFinite(n)) return '—';
+    return new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 2 }).format(n);
+  };
+  const fmtPct = v => isFinite(v) ? (Number(v).toFixed(2) + ' %') : '—';
+  const toLocalTime = t => { try { return new Date(t).toLocaleString('fr-FR',{hour12:false}); } catch { return '—'; } };
+
+  let timer = null, countdown = 0;
+  function startCountdown(seconds=300){
+    countdown = seconds; updateCountdownLabel();
+    if (timer) clearInterval(timer);
+    timer = setInterval(()=>{
+      countdown--; updateCountdownLabel();
+      if (countdown <= 0){ clearInterval(timer); load(); }
+    },1000);
+  }
+  function updateCountdownLabel(){
+    const m = Math.floor(countdown/60), s = String(countdown%60).padStart(2,'0');
+    nextIn.textContent = `Prochaine maj dans: ${m}:${s}`;
+  }
+
+  // --- Maths util ---
+  function regressSlope(xs, ys){
+    // slope of y ~ a + b*x ; returns b
+    const n = xs.length; if (n<2) return 0;
+    const mx = xs.reduce((a,b)=>a+b,0)/n;
+    const my = ys.reduce((a,b)=>a+b,0)/n;
+    let num=0, den=0;
+    for (let i=0;i<n;i++){ const dx = xs[i]-mx; num += dx*(ys[i]-my); den += dx*dx; }
+    return den===0 ? 0 : num/den;
+  }
+  const clamp01 = x => Math.max(0, Math.min(1, x));
+
+  // --- Confidence model (heuristique) ---
+  function confidenceFromFeatures({posRatio, vol, slope, turnover}){
+    // Normalisations douces
+    const fPos = posRatio;                           // 0..1
+    const fVol = 1 - clamp01(vol / 0.05);           // 0 vol → 1 ; 5%/h vol → 0
+    const fSlope = clamp01(slope / 0.002);          // ~0.2% log/heure → 0.1 ; 0.2%/h → 1 (cap)
+    const fTurn = clamp01(turnover / 0.1);          // 10% de la market cap en volume → 1
+    // Pondérations (somme = 1)
+    const wPos=0.40, wVol=0.25, wSlope=0.20, wTurn=0.15;
+    const score = wPos*fPos + wVol*fVol + wSlope*fSlope + wTurn*fTurn;
+    return Math.round(score*100);
+  }
+
+  async function fetchHistoryHourly(id){
+    // Dernières ~30h pour avoir 24 points propres quelle que soit l’heure
+    const end = Date.now();
+    const start = end - 30*60*60*1000;
+    const url = `https://api.coincap.io/v2/assets/${encodeURIComponent(id)}/history?interval=h1&start=${start}&end=${end}`;
+    const res = await fetch(url, { cache:'no-store' });
+    if (!res.ok) throw new Error(`history ${id}: HTTP ${res.status}`);
+    const js = await res.json();
+    // Retour : [{priceUsd, time}, ...]
+    return (js.data||[]).map(p => ({ t: p.time, px: Number(p.priceUsd) })).filter(p=>isFinite(p.px));
+  }
+
+  function featuresFromHistory(history, marketCapUsd, volumeUsd24Hr){
+    // Log-prix pour la pente
+    if (!history || history.length < 6){
+      // fallback “prudence”
+      const turnover = isFinite(volumeUsd24Hr/marketCapUsd) ? (volumeUsd24Hr/marketCapUsd) : 0;
+      return { posRatio: 0.5, vol: 0.05, slope: 0, turnover };
+    }
+    // On limite aux dernières 24 entrées si on en a plus
+    const h = history.slice(-24);
+    const rets = [];
+    for (let i=1;i<h.length;i++){
+      const r = (h[i].px - h[i-1].px) / h[i-1].px;
+      if (isFinite(r)) rets.push(r);
+    }
+    const posRatio = rets.length ? rets.filter(x=>x>0).length / rets.length : 0.5;
+    // volatilité horaire simple
+    const mean = rets.reduce((a,b)=>a+b,0) / (rets.length||1);
+    const vol = Math.sqrt(rets.reduce((a,b)=>a+(b-mean)*(b-mean),0) / (rets.length||1));
+    // pente de régression sur log prix vs. temps (heures normalisées)
+    const xs = h.map((_,i)=>i); // 0..n-1 (heures)
+    const ys = h.map(p=>Math.log(p.px));
+    const slope = regressSlope(xs, ys); // ~log par heure
+    const turnover = isFinite(volumeUsd24Hr/marketCapUsd) ? (volumeUsd24Hr/marketCapUsd) : 0;
+    return { posRatio, vol, slope, turnover };
+  }
+
+  // Limiteur de concurrence pour ne pas spammer l’API
+  async function mapLimit(items, limit, worker){
+    const ret = new Array(items.length);
+    let i=0, running=0;
+    return await new Promise((resolve,reject)=>{
+      const launch = () => {
+        while (running<limit && i<items.length){
+          const idx = i++, it = items[idx];
+          running++;
+          Promise.resolve(worker(it, idx))
+            .then(v=>ret[idx]=v)
+            .catch(err=>ret[idx]={error:err})
+            .finally(()=>{ running--; (i>=items.length && running===0) ? resolve(ret) : launch(); });
+        }
+      };
+      launch();
+    });
+  }
+
+  async function load(){
+    refreshBtn.disabled = true;
+    try{
+      // 1) Récupère la liste
+      const res = await fetch(API_ASSETS, { cache:'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const ts = data.timestamp || Date.now();
+      const top = (data.data || [])
+        .map(a => ({
+          id:a.id, name:a.name, symbol:a.symbol,
+          priceUsd:+a.priceUsd, marketCapUsd:+a.marketCapUsd,
+          volumeUsd24Hr:+a.volumeUsd24Hr, change24:+a.changePercent24Hr
+        }))
+        .filter(a => isFinite(a.change24) && a.change24 > 0)
+        .sort((a,b)=> b.change24 - a.change24)
+        .slice(0,20);
+
+      // 2) Pour ces 20, on prend l’historique horaire et calcule la confiance
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:18px;color:#9aa0b4">Calcul des scores de confiance…</td></tr>`;
+
+      const histories = await mapLimit(top, 5, async (asset) => {
+        try{
+          const hist = await fetchHistoryHourly(asset.id);
+          const feats = featuresFromHistory(hist, asset.marketCapUsd, asset.volumeUsd24Hr);
+          const conf = confidenceFromFeatures(feats);
+          return { ...asset, conf, _feats:feats };
+        }catch(e){
+          // en cas d’erreur d’historique, score conservateur
+          const feats = featuresFromHistory(null, asset.marketCapUsd, asset.volumeUsd24Hr);
+          const conf = confidenceFromFeatures(feats);
+          return { ...asset, conf, _feats:feats, _warn:`history: ${e.message}` };
+        }
+      });
+
+      // 3) Rend l’ensemble
+      render(histories);
+      lastUpdate.textContent = `Dernière maj: ${toLocalTime(ts)}`;
+      startCountdown(300);
+    }catch(err){
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:18px;color:#ffb4b4">
+        Erreur de chargement: ${err.message}. Nouvelle tentative dans 60s…
+      </td></tr>`;
+      startCountdown(60);
+    }finally{
+      refreshBtn.disabled = false;
+    }
+  }
+
+  function render(rows){
+    if (!rows.length){
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:18px;color:#9aa0b4">Aucune donnée</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map((r,i)=>{
+      const conf = Math.max(0, Math.min(100, r.conf|0));
+      return `
+      <tr title="Momentum:${(r._feats.posRatio*100).toFixed(0)}% • Vol (h): ${(r._feats.vol*100).toFixed(2)}% • Pente: ${(r._feats.slope*100).toFixed(3)}%/h • Turnover: ${(r._feats.turnover*100).toFixed(1)}%">
+        <td>${i+1}</td>
+        <td>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:.7"></div>
+            <div>
+              <div>${r.name} <span class="sym">(${r.symbol})</span></div>
+              <div class="sym hide-sm" style="font-size:12px">
+                <a href="https://coincap.io/assets/${encodeURIComponent(r.id)}" target="_blank" style="color:var(--accent)">Détails</a>
+              </div>
+            </div>
+          </div>
+        </td>
+        <td class="hide-sm num">${fmtPrice(r.priceUsd)}</td>
+        <td class="hide-md num">${fmtCompact(r.marketCapUsd)}</td>
+        <td class="hide-md num">${fmtCompact(r.volumeUsd24Hr)}</td>
+        <td class="num ${r.change24>=0?'pos':'neg'}">${fmtPct(r.change24)}</td>
+        <td class="num">
+          <div style="display:flex;gap:10px;align-items:center;justify-content:flex-end">
+            <div class="bar" style="width:110px"><span style="width:${conf}%"></span></div>
+            <div style="width:42px;text-align:right">${conf}%</div>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  refreshBtn.addEventListener('click', load);
+  document.addEventListener('visibilitychange', ()=>{ if (!document.hidden && countdown < 5) load(); });
+
+  load(); // premier chargement
+})();
+</script>
+</body>
+</html>
