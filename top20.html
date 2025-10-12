@@ -1,298 +1,275 @@
 <!doctype html>
 <html lang="fr">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Top 30 Coinbase — % hausse 24h (full coverage)</title>
-<style>
-:root{--bg:#0f1220;--card:#171a2b;--text:#e8eaf6;--muted:#9aa0b4;--green:#3ddc97;--red:#ff6b6b;--accent:#7c8cff;--border:#232643}
-*{box-sizing:border-box}
-body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#0e1120,#0a0d17 60%);color:var(--text);padding:24px}
-header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:10px}
-h1{font-size:20px;margin:0}
-.pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
-.btn{border:1px solid var(--border);background:var(--card);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
-.wrap{background:rgba(23,26,43,.6);backdrop-filter:saturate(1.2) blur(6px);border:1px solid var(--border);border-radius:14px;overflow:hidden}
-table{width:100%;border-collapse:separate;border-spacing:0}
-thead th{text-align:left;font-size:12px;letter-spacing:.02em;color:var(--muted);padding:12px 14px;background:rgba(124,140,255,.06);position:sticky;top:0;z-index:1}
-tbody td{padding:10px 14px;border-top:1px solid var(--border)}
-tbody tr:hover{background:rgba(124,140,255,.05)}
-.num{font-variant-numeric:tabular-nums;text-align:right}
-.sym{color:var(--muted)}
-.pos{color:var(--green);font-weight:600}
-.neg{color:var(--red);font-weight:600}
-.badge{padding:2px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--muted)}
-.progress{width:100%;height:10px;background:#0d1020;border:1px solid var(--border);border-radius:999px;overflow:hidden;margin:6px 0 10px 0}
-.progress>div{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#8be9fd);transition:width .15s ease}
-.status{color:var(--muted);font-size:12px;margin-top:-4px;margin-bottom:6px}
-.counters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
-.counter{border:1px solid var(--border);border-radius:999px;padding:4px 8px;color:var(--muted);font-size:12px}
-@media(max-width:700px){.hide-sm{display:none} body{padding:16px} h1{font-size:18px} tbody td, thead th{padding:10px}}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crypto – filtre par fenêtre & % hausse</title>
+  <style>
+    :root { --bg:#0b1220; --panel:#121a2b; --accent:#5eead4; --muted:#94a3b8; --text:#e2e8f0; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Inter,Arial;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,var(--bg),rgba(11,18,32,0.8));backdrop-filter:saturate(1.2) blur(6px);}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    .toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    select,button,input{background:var(--panel);border:1px solid rgba(255,255,255,.08);color:var(--text);padding:10px 12px;border-radius:12px}
+    select:focus,button:focus,input:focus{outline:2px solid var(--accent)}
+    button{cursor:pointer}
+    .status{font-size:14px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;margin-top:16px}
+    .card{grid-column:span 12;background:linear-gradient(180deg,var(--panel),rgba(18,26,43,.8));border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:14px;display:flex;justify-content:space-between;align-items:center}
+    @media (min-width:700px){.card{grid-column:span 6}}
+    @media (min-width:980px){.card{grid-column:span 4}}
+    .sym{font-weight:700;font-size:18px}
+    .name{font-size:13px;color:var(--muted)}
+    .price{font-variant-numeric:tabular-nums}
+    .pct{font-variant-numeric:tabular-nums;font-weight:700}
+    .pct.up{color:#22c55e}
+    .pct.down{color:#ef4444}
+    .small{font-size:12px;color:var(--muted)}
+    .footer{display:flex;gap:10px;align-items:center;margin-top:8px}
+    .chip{font-size:12px;padding:4px 8px;border-radius:999px;background:rgba(94,234,212,.08);border:1px solid rgba(94,234,212,.25);color:var(--accent)}
+    .right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+    .hidden{display:none}
+  </style>
 </head>
 <body>
-<header>
-  <h1>Top 30 — % de hausse (24h) · Coinbase v6</h1>
-  <span id="lastUpdate" class="pill">Dernière maj: —</span>
-  <span id="nextIn" class="pill">Prochaine maj dans: —</span>
-  <button id="refreshBtn" class="btn">↻ Actualiser</button>
-</header>
+  <header>
+    <div class="wrap">
+      <div class="toolbar">
+        <h1 style="margin:0;font-size:18px">📈 Crypto – % de hausse filtré V7</h1>
+        <div style="flex:1 1 auto"></div>
+        <label class="small">Fenêtre:</label>
+        <select id="windowSelect" title="Fenêtre de calcul du %">
+          <option value="24h" selected>24h</option>
+          <option value="12h">12h</option>
+          <option value="6h">6h</option>
+          <option value="3h">3h</option>
+          <option value="1h">1h</option>
+        </select>
+        <label class="small">Seuil %:</label>
+        <input id="thresholdInput" type="number" step="0.1" min="0" value="1" style="width:90px" />
+        <button id="refreshBtn">Rafraîchir</button>
+        <button id="csvBtn">Exporter CSV</button>
+      </div>
+      <div class="status" id="status">Prêt.</div>
+    </div>
+  </header>
 
-<div class="status" id="status">En attente…</div>
-<div class="progress"><div id="bar"></div></div>
-<div class="counters" id="counters"></div>
+  <main class="wrap">
+    <div class="grid" id="list"></div>
+  </main>
 
-<div class="wrap">
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Actif</th>
-        <th class="hide-sm">Prix</th>
-        <th class="hide-sm">Market Cap</th>
-        <th class="hide-sm">Vol 24h</th>
-        <th class="num">% 24h</th>
-        <th class="num">% Confiance</th>
-      </tr>
-    </thead>
-    <tbody id="tbody">
-      <tr><td colspan="7" style="padding:18px;color:#9aa0b4">Chargement…</td></tr>
-    </tbody>
-  </table>
-</div>
+  <script>
+  // ====== CONFIG ======
+  const WORKER_URL = 'https://spring-mud-37a1.gilles-e74.workers.dev/';
+  // Si votre worker supporte un paramètre comme ?window=24h, il sera utilisé.
 
-<footer style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:var(--muted)">
-  <div>Sources : Coinbase (prix/vol.) · CoinCap (market cap)</div>
-  <div><small>Auto-refresh: 5 min — Filtre : vol &gt; 1 M $ & prix &gt; 1 $</small></div>
-</footer>
+  // ====== UTIL ======
+  const ms = { '1h': 1*3600e3, '3h': 3*3600e3, '6h': 6*3600e3, '12h': 12*3600e3, '24h': 24*3600e3 };
+  const fmt = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+  const money = new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', maximumFractionDigits: 6 });
 
-<script>
-(async function(){
-  // ⚠️ Mets ici ton Worker Cloudflare
-  const EX = 'https://spring-mud-37a1.gilles-e74.workers.dev/coinbase';
-  const COINCAP = 'https://api.coincap.io/v2/assets?limit=2000';
+  function nowUtc(){ return Date.now(); }
 
-  const tbody = document.getElementById('tbody');
-  const lastUpdate = document.getElementById('lastUpdate');
-  const nextIn = document.getElementById('nextIn');
-  const refreshBtn = document.getElementById('refreshBtn');
-  const bar = document.getElementById('bar');
-  const statusEl = document.getElementById('status');
-  const countersEl = document.getElementById('counters');
-
-  const fmtUSD = v => isFinite(+v)? new Intl.NumberFormat('fr-FR',{style:'currency',currency:'USD',maximumFractionDigits:(+v>=1?2:6),minimumFractionDigits:(+v>=1?2:4)}).format(+v):'—';
-  const fmtCompact = v => isFinite(+v)? new Intl.NumberFormat('fr-FR',{notation:'compact',maximumFractionDigits:2}).format(+v):'—';
-  const fmtPct = v => isFinite(+v)? (+v).toFixed(2)+' %':'—';
-  const toLocal = t => new Date(t).toLocaleString('fr-FR',{hour12:false});
-
-  let timer=null, countdown=0;
-  function startCountdown(sec=300){ countdown=sec; updateCountdown(); if (timer) clearInterval(timer);
-    timer=setInterval(()=>{ countdown--; updateCountdown(); if(countdown<=0){clearInterval(timer); load();} },1000);}
-  function updateCountdown(){ const m=Math.floor(countdown/60), s=String(countdown%60).padStart(2,'0'); nextIn.textContent=`Prochaine maj dans: ${m}:${s}`; }
-
-  const sleep = ms => new Promise(r=>setTimeout(r,ms));
-  async function fetchJSON(url, init={}) {
-    const res = await fetch(url, { ...init, headers: { 'Accept': 'application/json', ...(init.headers||{}) }, cache:'no-store' });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText} @ ${url}`);
-    return res.json();
-  }
-  function setProgress(pct, txt){ bar.style.width = Math.max(0, Math.min(100, pct)) + '%'; statusEl.textContent = txt || ''; }
-  function setCounters({products=0, considered=0, statsOK=0, passed=0, shown=0}){
-    countersEl.innerHTML = [
-      ['Produits USD/USDT', products],
-      ['Stats ok', statsOK],
-      ['Filtre OK (prix>1$, vol>1M$)', passed],
-      ['Affichés', shown],
-    ].map(([k,v])=>`<span class="counter">${k}: <strong>${v}</strong></span>`).join('');
-  }
-
-  function confidencePct({mom60, volX, trendGreen, proxHigh}){
-    const clamp = x => Math.max(0, Math.min(1, x));
-    const score = 0.35*clamp(mom60) + 0.30*clamp(volX) + 0.20*clamp(trendGreen) + 0.15*clamp(proxHigh);
-    return Math.round(score*100);
-  }
-
-  async function buildMarketCapMap(){
-    try{
-      setProgress(4, 'Market caps (CoinCap)…');
-      const data = await fetchJSON(COINCAP);
-      const map = {};
-      for (const a of (data.data||[])){
-        const sym = (a.symbol||'').toUpperCase();
-        const mc = +a.marketCapUsd;
-        if (sym && isFinite(mc)) map[sym] = Math.max(map[sym]||0, mc);
+  function pickPct(item, window){
+    // Essaie d'extraire un % déjà calculé selon la fenêtre
+    const map = {
+      '1h': ['pct_1h','change_1h','price_change_percentage_1h_in_currency','pct1h'],
+      '3h': ['pct_3h','change_3h','pct3h'],
+      '6h': ['pct_6h','change_6h','pct6h'],
+      '12h':['pct_12h','change_12h','pct12h'],
+      '24h':['pct_24h','change_24h','price_change_percentage_24h','price_change_percentage_24h_in_currency','pct24h']
+    };
+    const keys = map[window] || [];
+    for (const k of keys){
+      if (item[k] !== undefined && item[k] !== null){
+        const v = Number(item[k]);
+        if (!Number.isNaN(v)) return v;
       }
-      return map;
-    }catch{ return {}; }
-  }
-
-  // Pool générique (concurrence contrôlée)
-  async function mapPool(items, worker, concurrency=8, onProgress){
-    const results = new Array(items.length);
-    let i=0, done=0;
-    const runners = new Array(concurrency).fill(0).map(async ()=>{
-      while(i<items.length){
-        const idx = i++; // prendre un index
-        try { results[idx] = await worker(items[idx], idx); } catch(e){ results[idx] = null; }
-        done++; onProgress && onProgress(done, items.length);
-        await sleep(60); // petit delai pour ménager l’API
-      }
-    });
-    await Promise.all(runners);
-    return results;
-  }
-
-  async function load(){
-    refreshBtn.disabled = true;
-    try{
-      setProgress(0, 'Préparation…'); setCounters({});
-      const mcMapPromise = buildMarketCapMap();
-
-      // 1) Produits
-      setProgress(8, 'Produits Coinbase…');
-      const products = await fetchJSON(`${EX}/products`);
-      // USD/USDT actifs
-      const spot = products.filter(p =>
-        (p.status === 'online' || p.status === 'online_trading') &&
-        (p.quote_currency === 'USD' || p.quote_currency === 'USDT') &&
-        !p.trading_disabled && !p.cancel_only && !p.post_only
-      );
-      setCounters({products: spot.length});
-
-      // 2) Volume résumé (pour volX de la confiance)
-      setProgress(12, 'Volumes globaux…');
-      let volMap = {};
-      try{
-        const volSum = await fetchJSON(`${EX}/products/volume-summary`);
-        for (const row of (volSum||[])) volMap[row.product_id] = { v24:+row.volume_24h || 0, v30:+row.volume_30day || 0 };
-      }catch{}
-
-      // 3) Stats 24h — pour TOUTES les paires (pool 8)
-      let statsOK=0;
-      setProgress(20, `Stats 24h… 0/${spot.length}`);
-      const statsList = await mapPool(spot, async (p, idx)=>{
-        const s = await fetchJSON(`${EX}/products/${encodeURIComponent(p.id)}/stats`);
-        const open = +s.open, last= +s.last, high= +s.high, low= +s.low, volBase = +s.volume;
-        const changePct = (isFinite(open) && open>0 && isFinite(last)) ? ((last-open)/open)*100 : NaN;
-        const volUsd = (isFinite(volBase) && isFinite(last)) ? volBase * last : NaN;
-        if (isFinite(changePct) && isFinite(last)) statsOK++;
-        return {product:p, changePct, last, high, low, volBase, volUsd};
-      }, 8, (done,total)=>{
-        const pct = 20 + Math.round(40*done/total);
-        setProgress(pct, `Stats 24h… ${done}/${total}`);
-      });
-      setCounters({products: spot.length, statsOK});
-
-      const stats = statsList.filter(Boolean);
-
-      // 4) Filtre + tri
-      setProgress(62, 'Filtrage prix>1$ & vol>1M$…');
-      const filtered = stats
-        .filter(x => isFinite(x.changePct) && x.changePct > 0 && isFinite(x.last) && x.last > 1 && isFinite(x.volUsd) && x.volUsd > 1_000_000)
-        .sort((a,b)=> b.changePct - a.changePct);
-
-      // 5) Bougies 5m pour confiance (sur la liste filtrée uniquement)
-      let passed = filtered.length;
-      setCounters({products: spot.length, statsOK, passed});
-      setProgress(66, `Bougies 5m… 0/${passed}`);
-      const enriched = await mapPool(filtered, async (item)=>{
-        const pid = item.product.id;
-        let mom60=0, volX=0, trendGreen=0, proxHigh=0;
-
-        try{
-          const now = Date.now();
-          const end = new Date(now).toISOString();
-          const start = new Date(now - 65*60*1000).toISOString();
-          const candles = await fetchJSON(`${EX}/products/${encodeURIComponent(pid)}/candles?granularity=300&start=${start}&end=${end}`);
-          const cs = (candles||[]).sort((a,b)=> a[0]-b[0]);
-          if (cs.length>=2){
-            const first = cs[0], lastC = cs[cs.length-1];
-            const p0 = +first[3], p1 = +lastC[4];
-            mom60 = isFinite(p0)&&p0>0&&isFinite(p1)? Math.max(-1, Math.min(1, (p1-p0)/p0*5)) : 0;
-            const greens = cs.filter(c => (+c[4])>(+c[3])).length;
-            trendGreen = greens / cs.length;
-          }
-        }catch{}
-
-        const vm = volMap[item.product.id];
-        if (vm && vm.v30>0){
-          const avgDaily = vm.v30/30;
-          volX = Math.min(1, (vm.v24/avgDaily)/3);
-        }
-
-        if (isFinite(item.high) && isFinite(item.low) && item.high>item.low && isFinite(item.last)){
-          const rng = item.high - item.low;
-          proxHigh = Math.max(0, Math.min(1, (item.last - item.low)/rng));
-        }
-
-        const conf = confidencePct({mom60, volX, trendGreen, proxHigh});
-        return { ...item, conf };
-      }, 8, (done,total)=>{
-        const pct = 66 + Math.round(24*done/total);
-        setProgress(pct, `Bougies 5m… ${done}/${total}`);
-      });
-
-      // 6) Market cap & rendu
-      setProgress(92, 'Market caps…');
-      const mcMap = await mcMapPromise;
-      const rows = enriched.map(x => ({ ...x, marketCapUsd: mcMap[(x.product.base_currency||'').toUpperCase()] || NaN }))
-                          .slice(0,30);
-
-      setProgress(98, `Rendu (${rows.length})…`);
-      render(rows);
-      lastUpdate.textContent = `Dernière maj: ${toLocal(Date.now())}`;
-      setCounters({products: spot.length, statsOK, passed, shown: rows.length});
-      setProgress(100, 'Terminé ✅');
-      startCountdown(300);
-      refreshBtn.disabled = false;
-
-    }catch(err){
-      tbody.innerHTML = `<tr><td colspan="7" style="padding:18px;color:#ffb4b4">Erreur: ${err.message}. Nouvelle tentative dans 60s…</td></tr>`;
-      setProgress(0, `Erreur: ${err.message}`);
-      setCounters({});
-      startCountdown(60);
-      refreshBtn.disabled = false;
     }
+    return null;
+  }
+
+  function pctFromHistory(item, window){
+    // Tente de calculer le % depuis un historique si présent
+    // On cherche un tableau d'objets { t: timestamp(ms|s), p: price } ou similaire
+    const series = item.history || item.prices || item.candles || item.ohlc || null;
+    if (!Array.isArray(series) || series.length === 0) return null;
+
+    const targetAgo = ms[window] || ms['24h'];
+    const now = nowUtc();
+
+    function getTs(x){
+      const t = x.t ?? x.time ?? x.timestamp ?? x[0];
+      if (t==null) return null;
+      // seconds -> ms si besoin
+      return (t < 2e10) ? t*1000 : t;
+    }
+    function getPrice(x){ return x.p ?? x.price ?? x.close ?? x[1] ?? null; }
+
+    let current = null, past = null, minDeltaNow = Infinity, minDeltaPast = Infinity;
+    for (const x of series){
+      const t = getTs(x); const p = Number(getPrice(x));
+      if (!t || Number.isNaN(p)) continue;
+      const dNow = Math.abs(now - t);
+      const dPast = Math.abs((now - targetAgo) - t);
+      if (dNow < minDeltaNow){ minDeltaNow = dNow; current = p; }
+      if (dPast < minDeltaPast){ minDeltaPast = dPast; past = p; }
+    }
+    if (current && past){
+      return ((current - past) / past) * 100;
+    }
+    return null;
+  }
+
+  function normalizeItem(raw){
+    // Essaie de normaliser différentes structures venant du worker
+    const sym = raw.symbol || raw.ticker || raw.base || raw.code || raw.id || raw.slug || '';
+    const name = raw.name || raw.base_name || raw.asset || raw.title || sym;
+    const price = Number(raw.price || raw.last || raw.rate || raw.spot || raw.current_price || raw.p || raw.close);
+    const vol = Number(raw.volume_24h || raw.vol24h || raw.volume || raw.quote_volume || raw.v);
+    return { ...raw, sym, name, price, vol };
+  }
+
+  function toCSV(rows){
+    const header = ['symbol','name','price_usd','pct','volume_24h'];
+    const lines = [header.join(',')];
+    for (const r of rows){
+      const cells = [r.sym, r.name?.replaceAll(',',' '), r.price?.toString() ?? '', r.pct?.toFixed(4) ?? '', r.vol?.toString() ?? ''];
+      lines.push(cells.join(','));
+    }
+    return lines.join('\n');
+  }
+
+  // ====== DATA FLOW ======
+  const statusEl = document.getElementById('status');
+  const listEl = document.getElementById('list');
+  const windowSelect = document.getElementById('windowSelect');
+  const thresholdInput = document.getElementById('thresholdInput');
+  const refreshBtn = document.getElementById('refreshBtn');
+  const csvBtn = document.getElementById('csvBtn');
+
+  let timer = null;
+
+  async function fetchWorker(windowValue){
+    // Essaie d'appeler le worker avec un paramètre de fenêtre, sinon sans
+    const url = new URL(WORKER_URL);
+    url.searchParams.set('window', windowValue);
+    url.searchParams.set('limit', '300'); // si votre worker le supporte
+
+    const tryUrls = [url.toString(), WORKER_URL];
+    for (const u of tryUrls){
+      try {
+        const t0 = performance.now();
+        statusEl.textContent = `Chargement… (${windowValue})`;
+        const res = await fetch(u, {cache:'no-store'});
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const dt = (performance.now() - t0).toFixed(0);
+        statusEl.textContent = `Données reçues en ${dt} ms`;
+        return data;
+      } catch(e){
+        console.warn('Échec sur', u, e);
+      }
+    }
+    throw new Error('Impossible de joindre le worker');
   }
 
   function render(rows){
-    if (!rows.length){
-      tbody.innerHTML = `<tr><td colspan="7" style="padding:18px;color:#9aa0b4">Aucune donnée après filtrage (prix > 1 $ et volume 24h > 1 M $).</td></tr>`;
+    listEl.innerHTML = '';
+    if (!rows || rows.length === 0){
+      listEl.innerHTML = `<div class="card">Aucun actif ne dépasse le seuil spécifié.</div>`;
       return;
     }
-    tbody.innerHTML = rows.map((r,i)=>{
-      const p = r.product;
-      const asset = `${p.base_currency}-${p.quote_currency}`;
-      const mc = isFinite(r.marketCapUsd)? fmtCompact(r.marketCapUsd) : '—';
-      const vol = isFinite(r.volUsd)? fmtCompact(r.volUsd) : '—';
-      const pos = r.changePct>=0;
-      return `
-      <tr>
-        <td>${i+1}</td>
-        <td>
-          <div style="display:flex;gap:10px;align-items:center">
-            <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:.7"></div>
-            <div>
-              <div>${p.base_currency} <span class="sym">(${asset})</span></div>
-              <div class="sym hide-sm" style="font-size:12px">
-                <a href="https://exchange.coinbase.com/trade/${encodeURIComponent(asset)}" target="_blank" style="color:var(--accent)">Ouvrir sur Coinbase</a>
-              </div>
-            </div>
+    const frag = document.createDocumentFragment();
+    rows.forEach(r => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div>
+          <div class="sym">${r.sym || ''}</div>
+          <div class="name">${r.name || ''}</div>
+          <div class="footer">
+            <span class="chip">${r.window}</span>
+            <span class="small">Vol 24h: ${Number.isFinite(r.vol) ? fmt.format(r.vol) : '—'}</span>
           </div>
-        </td>
-        <td class="hide-sm num">${fmtUSD(r.last)}</td>
-        <td class="hide-sm num">${mc}</td>
-        <td class="hide-sm num">${vol}</td>
-        <td class="num ${pos?'pos':'neg'}">${fmtPct(r.changePct)}</td>
-        <td class="num"><strong>${r.conf} %</strong></td>
-      </tr>`;
-    }).join('');
+        </div>
+        <div class="right">
+          <div class="price">${Number.isFinite(r.price) ? money.format(r.price) : '—'}</div>
+          <div class="pct ${r.pct>=0?'up':'down'}">${Number.isFinite(r.pct) ? r.pct.toFixed(2)+'%' : '—'}</div>
+        </div>
+      `;
+      frag.appendChild(card);
+    });
+    listEl.appendChild(frag);
   }
 
-  document.getElementById('refreshBtn').addEventListener('click', load);
-  document.addEventListener('visibilitychange', ()=>{ if (!document.hidden && countdown < 5) load(); });
-  load();
-})();
-</script>
+  async function refresh(){
+    const windowValue = windowSelect.value;
+    const threshold = Number(thresholdInput.value) || 1;
+
+    try{
+      const raw = await fetchWorker(windowValue);
+      // Supporte soit un tableau direct, soit un objet { data: [...] }
+      const arr = Array.isArray(raw) ? raw : (raw.data || raw.items || raw.result || []);
+
+      const rows = [];
+      for (const item of arr){
+        const n = normalizeItem(item);
+        // prix requis
+        if (!Number.isFinite(n.price)) continue;
+
+        let pct = pickPct(n, windowValue);
+        if (pct === null){
+          pct = pctFromHistory(n, windowValue);
+        }
+        if (pct === null) continue; // pas de % exploitable
+
+        if (pct >= threshold){
+          rows.push({ ...n, pct, window: windowValue });
+        }
+      }
+
+      // Tri décroissant par %
+      rows.sort((a,b)=>b.pct - a.pct);
+
+      render(rows);
+      statusEl.textContent = `Affichage: ${rows.length} actifs (seuil ≥ ${threshold}%, fenêtre ${windowValue})`;
+      return rows;
+    }catch(e){
+      console.error(e);
+      statusEl.textContent = `Erreur: ${e.message}`;
+      render([]);
+      return [];
+    }
+  }
+
+  refreshBtn.addEventListener('click', refresh);
+  windowSelect.addEventListener('change', ()=>{ refresh(); });
+  thresholdInput.addEventListener('change', ()=>{ refresh(); });
+
+  csvBtn.addEventListener('click', async()=>{
+    const windowValue = windowSelect.value;
+    const rows = await refresh();
+    const csv = toCSV(rows);
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `crypto_filtered_${windowValue}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  // Auto-refresh toutes les 5 minutes
+  function startTimer(){
+    if (timer) clearInterval(timer);
+    timer = setInterval(refresh, 5*60*1000);
+  }
+  startTimer();
+  refresh();
+  </script>
 </body>
 </html>
