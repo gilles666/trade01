@@ -36,7 +36,7 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
 </head>
 <body>
 <header>
-  <h1>Top 30 — % de hausse (24h) · Coinbase</h1>
+  <h1>Top 30 — % de hausse (24h) · Coinbase v5</h1>
   <span id="lastUpdate" class="pill">Dernière maj: —</span>
   <span id="nextIn" class="pill">Prochaine maj dans: —</span>
   <button id="refreshBtn" class="btn">↻ Actualiser</button>
@@ -72,7 +72,7 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
 <script>
 (async function(){
   // ⚠️ REMPLACE EX PAR TON WORKER (ex: 'https://ton-nom.workers.dev/coinbase')
-  const EX = 'https://ton-nom.workers.dev/coinbase';
+  const EX = 'https://spring-mud-37a1.gilles-e74.workers.dev/coinbase';
   const COINCAP = 'https://api.coincap.io/v2/assets?limit=2000';
   const tbody = document.getElementById('tbody');
   const lastUpdate = document.getElementById('lastUpdate');
