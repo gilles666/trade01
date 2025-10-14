@@ -1,366 +1,92 @@
 <!doctype html>
 <html lang="fr">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Top 30 Coinbase — % hausse (fenêtre variable)</title>
-<style>
-:root{--bg:#0f1220;--card:#171a2b;--text:#e8eaf6;--muted:#9aa0b4;--green:#3ddc97;--red:#ff6b6b;--accent:#7c8cff;--border:#232643}
-*{box-sizing:border-box}
-body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#0e1120,#0a0d17 60%);color:var(--text);padding:24px}
-header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:10px}
-h1{font-size:20px;margin:0}
-.pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
-.btn{border:1px solid var(--border);background:var(--card);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
-.wrap{background:rgba(23,26,43,.6);backdrop-filter:saturate(1.2) blur(6px);border:1px solid var(--border);border-radius:14px;overflow:hidden}
-.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-select{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
-table{width:100%;border-collapse:separate;border-spacing:0}
-thead th{text-align:left;font-size:12px;letter-spacing:.02em;color:var(--muted);padding:12px 14px;background:rgba(124,140,255,.06);position:sticky;top:0;z-index:1}
-tbody td{padding:10px 14px;border-top:1px solid var(--border)}
-tbody tr:hover{background:rgba(124,140,255,.05)}
-.num{font-variant-numeric:tabular-nums;text-align:right}
-.sym{color:var(--muted)}
-.pos{color:var(--green);font-weight:600}
-.neg{color:var(--red);font-weight:600}
-.badge{padding:2px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--muted)}
-.progress{width:100%;height:10px;background:#0d1020;border:1px solid var(--border);border-radius:999px;overflow:hidden;margin:6px 0 10px 0}
-.progress>div{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#8be9fd);transition:width .15s ease}
-.status{color:var(--muted);font-size:12px;margin-top:-4px;margin-bottom:6px}
-.counters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
-.counter{border:1px solid var(--border);border-radius:999px;padding:4px 8px;color:var(--muted);font-size:12px}
-@media(max-width:700px){.hide-sm{display:none} body{padding:16px} h1{font-size:18px} tbody td, thead th{padding:10px}}
-</style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Top 30 — Coinbase · % de hausse</title>
+  <style>
+    :root{--bg:#0f1220;--card:#171a2b;--text:#e8eaf6;--muted:#9aa0b4;--green:#3ddc97;--red:#ff6b6b;--accent:#7c8cff;--border:#232643}
+    *{box-sizing:border-box}
+    body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#0e1120,#0a0d17 60%);color:var(--text);padding:24px}
+    header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:10px}
+    h1{font-size:20px;margin:0}
+    .pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
+    .btn{border:1px solid var(--border);background:var(--card);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
+    .wrap{background:rgba(23,26,43,.6);backdrop-filter:saturate(1.2) blur(6px);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+    .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    select{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+    table{width:100%;border-collapse:separate;border-spacing:0}
+    thead th{text-align:left;font-size:12px;letter-spacing:.02em;color:var(--muted);padding:12px 14px;background:rgba(124,140,255,.06);position:sticky;top:0;z-index:1}
+    tbody td{padding:10px 14px;border-top:1px solid var(--border)}
+    tbody tr:hover{background:rgba(124,140,255,.05)}
+    .num{font-variant-numeric:tabular-nums;text-align:right}
+    .sym{color:var(--muted)}
+    .pos{color:var(--green);font-weight:600}
+    .neg{color:var(--red);font-weight:600}
+    .progress{width:100%;height:10px;background:#0d1020;border:1px solid var(--border);border-radius:999px;overflow:hidden;margin:6px 0 10px 0}
+    .progress>div{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#8be9fd);transition:width .15s ease}
+    .status{color:var(--muted);font-size:12px;margin-top:-4px;margin-bottom:6px}
+    .counters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+    .counter{border:1px solid var(--border);border-radius:999px;padding:4px 8px;color:var(--muted);font-size:12px}
+    @media(max-width:700px){.hide-sm{display:none} body{padding:16px} h1{font-size:18px} tbody td, thead th{padding:10px}}
+  </style>
 </head>
 <body>
-<header>
-  <h1>Top 30 — % de hausse · Coinbase v9</h1>
-  <div class="controls">
-    <label class="sym" for="windowSel">Fenêtre % :</label>
-    <select id="windowSel">
-      <option value="24">24h</option>
-      <option value="12">12h</option>
-      <option value="6">6h</option>
-      <option value="3">3h</option>
-      <option value="1">1h</option>
-    </select>
+  <header>
+    <h1>Top 30 — % de hausse · Coinbase</h1>
+    <div class="controls">
+      <label class="sym" for="windowSel">Fenêtre % :</label>
+      <select id="windowSel">
+        <option value="24">24h</option>
+        <option value="12">12h</option>
+        <option value="6">6h</option>
+        <option value="3">3h</option>
+        <option value="1">1h</option>
+      </select>
 
-    <label class="sym" for="minVolSel">Volume 24h min (USD) :</label>
-    <select id="minVolSel">
-      <option value="1000">1 000</option>
-      <option value="10000">10 000</option>
-      <option value="100000">100 000</option>
-      <option value="1000000" selected>1 000 000</option>
-    </select>
+      <label class="sym" for="minVolSel">Volume 24h min (USD) :</label>
+      <select id="minVolSel">
+        <option value="1000">1 000</option>
+        <option value="10000">10 000</option>
+        <option value="100000">100 000</option>
+        <option value="1000000" selected>1 000 000</option>
+      </select>
 
-    <span class="pill" id="lastUpdate">Dernière maj: —</span>
-    <span class="pill" id="nextIn">Prochaine maj dans: —</span>
-    <button id="refreshBtn" class="btn">↻ Actualiser</button>
+      <span class="pill" id="lastUpdate">Dernière maj: —</span>
+      <span class="pill" id="nextIn">Prochaine maj dans: —</span>
+      <button id="refreshBtn" class="btn">↻ Actualiser</button>
+    </div>
+  </header>
+
+  <div class="status" id="status">En attente…</div>
+  <div class="progress"><div id="bar"></div></div>
+  <div class="counters" id="counters"></div>
+
+  <div class="wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Actif</th>
+          <th class="hide-sm">Prix</th>
+          <th class="hide-sm">Market Cap</th>
+          <th class="hide-sm">Vol 24h</th>
+          <th class="num">% (fenêtre)</th>
+          <th class="num">% Confiance</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="7" style="padding:18px;color:#9aa0b4">Chargement…</td></tr>
+      </tbody>
+    </table>
   </div>
-</header>
 
-<div class="status" id="status">En attente…</div>
-<div class="progress"><div id="bar"></div></div>
-<div class="counters" id="counters"></div>
+  <footer style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:var(--muted)">
+    <div>Sources : Coinbase (prix/vol.) · CoinCap (market cap)</div>
+    <div><small>Filtres : prix &gt; 1 $ · % &gt; 1 % · vol24h ≥ seuil — Auto-refresh 5 min</small></div>
+  </footer>
 
-<div class="wrap">
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Actif</th>
-        <th class="hide-sm">Prix</th>
-        <th class="hide-sm">Market Cap</th>
-        <th class="hide-sm">Vol 24h</th>
-        <th class="num">% (fenêtre)</th>
-        <th class="num">% Confiance</th>
-      </tr>
-    </thead>
-    <tbody id="tbody">
-      <tr><td colspan="7" style="padding:18px;color:#9aa0b4">Chargement…</td></tr>
-    </tbody>
-  </table>
-</div>
-
-<footer style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:var(--muted)">
-  <div>Sources : Coinbase (prix/vol.) · CoinCap (market cap)</div>
-  <div><small>Filtres : prix &gt; 1 $ · % &gt; 1 % · vol24h ≥ seuil — Auto-refresh 5 min</small></div>
-</footer>
-
-<script>
-(async function(){
-  // 👉 Ton Worker Cloudflare
-  const EX = 'https://spring-mud-37a1.gilles-e74.workers.dev/coinbase';
-  const COINCAP = 'https://api.coincap.io/v2/assets?limit=2000';
-  const MIN_PCT = 1; // ne garder que > 1%
-
-  const tbody = document.getElementById('tbody');
-  const lastUpdate = document.getElementById('lastUpdate');
-  const nextIn = document.getElementById('nextIn');
-  const refreshBtn = document.getElementById('refreshBtn');
-  const bar = document.getElementById('bar');
-  const statusEl = document.getElementById('status');
-  const countersEl = document.getElementById('counters');
-  const windowSel = document.getElementById('windowSel');
-  const minVolSel = document.getElementById('minVolSel');
-
-  const fmtUSD = v => isFinite(+v)? new Intl.NumberFormat('fr-FR',{style:'currency',currency:'USD',maximumFractionDigits:(+v>=1?2:6),minimumFractionDigits:(+v>=1?2:4)}).format(+v):'—';
-  const fmtCompact = v => isFinite(+v)? new Intl.NumberFormat('fr-FR',{notation:'compact',maximumFractionDigits:2}).format(+v):'—';
-  const fmtPct = v => isFinite(+v)? (+v).toFixed(2)+' %':'—';
-  const toLocal = t => new Date(t).toLocaleString('fr-FR',{hour12:false});
-
-  let timer=null, countdown=0;
-  function startCountdown(sec=300){ countdown=sec; updateCountdown(); if (timer) clearInterval(timer);
-    timer=setInterval(()=>{ countdown--; updateCountdown(); if(countdown<=0){clearInterval(timer); load();} },1000);}
-  function updateCountdown(){ const m=Math.floor(countdown/60), s=String(countdown%60).padStart(2,'0'); nextIn.textContent=`Prochaine maj dans: ${m}:${s}`; }
-
-  const sleep = ms => new Promise(r=>setTimeout(r,ms));
-  async function fetchJSON(url, init={}) {
-    const res = await fetch(url, { ...init, headers: { 'Accept': 'application/json', ...(init.headers||{}) }, cache:'no-store' });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText} @ ${url}`);
-    return res.json();
-  }
-  function setProgress(pct, txt){ bar.style.width = Math.max(0, Math.min(100, pct)) + '%'; statusEl.textContent = txt || ''; }
-  function setCounters({products=0, statsOK=0, passed=0, shown=0, volMin=0, hours=24}){
-    countersEl.innerHTML = [
-      ['Fenêtre %', hours+'h'],
-      ['Vol 24h min (USD)', new Intl.NumberFormat('fr-FR').format(volMin)],
-      ['Produits USD/USDT', products],
-      ['Stats ok', statsOK],
-      ['Filtre OK (prix>1$, vol≥seuil, %>'+MIN_PCT+'%)', passed],
-      ['Affichés', shown],
-    ].map(([k,v])=>`<span class="counter">${k}: <strong>${v}</strong></span>`).join('');
-  }
-
-  function confidencePct({mom60, volX, trendGreen, proxHigh}){
-    const clamp = x => Math.max(0, Math.min(1, x));
-    const score = 0.35*clamp(mom60) + 0.30*clamp(volX) + 0.20*clamp(trendGreen) + 0.15*clamp(proxHigh);
-    return Math.round(score*100);
-  }
-
-  async function buildMarketCapMap(){
-    try{
-      setProgress(4, 'Market caps (CoinCap)…');
-      const data = await fetchJSON(COINCAP);
-      const map = {};
-      for (const a of (data.data||[])){
-        const sym = (a.symbol||'').toUpperCase();
-        const mc = +a.marketCapUsd;
-        if (sym && isFinite(mc)) map[sym] = Math.max(map[sym]||0, mc);
-      }
-      return map;
-    }catch{ return {}; }
-  }
-
-  // Pool générique (concurrence contrôlée)
-  async function mapPool(items, worker, concurrency=8, onProgress){
-    const results = new Array(items.length);
-    let i=0, done=0;
-    const runners = new Array(concurrency).fill(0).map(async ()=>{
-      while(i<items.length){
-        const idx = i++;
-        try { results[idx] = await worker(items[idx], idx); } catch(e){ results[idx] = null; }
-        done++; onProgress && onProgress(done, items.length);
-        await sleep(60);
-      }
-    });
-    await Promise.all(runners);
-    return results;
-  }
-
-  // Calcule % de hausse sur N heures via candles 5m (pour 12h, 6h, 3h, 1h)
-  async function percentChangeFromCandles(productId, hours){
-    const now = Date.now();
-    const end = new Date(now).toISOString();
-    const start = new Date(now - (hours*60+5)*60*1000).toISOString();
-    const candles = await fetchJSON(`${EX}/products/${encodeURIComponent(productId)}/candles?granularity=300&start=${start}&end=${end}`);
-    const cs = (candles||[]).sort((a,b)=> a[0]-b[0]); // [time, low, high, open, close, volume]
-    if (cs.length < 2) return NaN;
-    const firstClose = +cs[0][4];
-    const lastClose  = +cs[cs.length-1][4];
-    if (!isFinite(firstClose) || firstClose<=0 || !isFinite(lastClose)) return NaN;
-    return (lastClose - firstClose) / firstClose * 100;
-  }
-
-  async function load(){
-    const hours = +windowSel.value;
-    const volMin = +minVolSel.value; // nouveau seuil volume en USD
-    refreshBtn.disabled = true;
-    windowSel.disabled = true;
-    minVolSel.disabled = true;
-    try{
-      setProgress(0, `Préparation (fenêtre ${hours}h, vol≥${volMin})…`); setCounters({volMin, hours});
-      const mcMapPromise = buildMarketCapMap();
-
-      // 1) Produits
-      setProgress(8, 'Produits Coinbase…');
-      const products = await fetchJSON(`${EX}/products`);
-      const spot = products.filter(p =>
-        (p.status === 'online' || p.status === 'online_trading') &&
-        (p.quote_currency === 'USD' || p.quote_currency === 'USDT') &&
-        !p.trading_disabled && !p.cancel_only && !p.post_only
-      );
-
-      // 2) Stats 24h pour prix/vol
-      let statsOK=0;
-      setProgress(18, `Stats 24h (prix & vol)… 0/${spot.length}`);
-      const statsList = await mapPool(spot, async (p)=>{
-        const s = await fetchJSON(`${EX}/products/${encodeURIComponent(p.id)}/stats`);
-        const open = +s.open, last= +s.last, high= +s.high, low= +s.low, volBase = +s.volume;
-        const pct24 = (isFinite(open) && open>0 && isFinite(last)) ? ((last-open)/open)*100 : NaN;
-        const volUsd = (isFinite(volBase) && isFinite(last)) ? volBase * last : NaN;
-        if (isFinite(last)) statsOK++;
-        return {product:p, pct24, last, high, low, volBase, volUsd};
-      }, 8, (done,total)=>{
-        const pct = 18 + Math.round(34*done/total);
-        setProgress(pct, `Stats 24h (prix & vol)… ${done}/${total}`);
-      });
-
-      setCounters({products: spot.length, statsOK, volMin, hours});
-      const baseStats = statsList.filter(Boolean);
-
-      // 3) Filtre prix >1$ & vol24h ≥ seuil choisi
-      setProgress(54, `Filtre prix>1$ & vol24h≥${volMin}…`);
-      let preFiltered = baseStats.filter(x => isFinite(x.last) && x.last > 1 && isFinite(x.volUsd) && x.volUsd >= volMin);
-
-      // 4) Calcul du % fenêtre
-      let withPct = [];
-      if (hours === 24){
-        withPct = preFiltered.map(x => ({...x, pct: x.pct24}));
-      } else {
-        setProgress(60, `Calcul % ${hours}h via bougies… 0/${preFiltered.length}`);
-        const pctList = await mapPool(preFiltered, async (x)=>{
-          const pct = await percentChangeFromCandles(x.product.id, hours);
-          return {...x, pct};
-        }, 8, (done,total)=>{
-          const pct = 60 + Math.round(20*done/total);
-          setProgress(pct, `Calcul % ${hours}h via bougies… ${done}/${total}`);
-        });
-        withPct = pctList.filter(Boolean);
-      }
-
-      // 5) Filtre % > 1 %
-      const passed = withPct.filter(x => isFinite(x.pct) && x.pct > MIN_PCT);
-
-      // 6) Confiance (bougies 1h) sur la liste passée
-      setCounters({products: spot.length, statsOK, passed: passed.length, volMin, hours});
-      setProgress(80, `Confiance (bougies 1h)… 0/${passed.length}`);
-      const enriched = await mapPool(passed, async (item)=>{
-        const pid = item.product.id;
-        let mom60=0, volX=0, trendGreen=0, proxHigh=0;
-
-        try{
-          const now = Date.now();
-          const end = new Date(now).toISOString();
-          const start = new Date(now - 65*60*1000).toISOString();
-          const candles = await fetchJSON(`${EX}/products/${encodeURIComponent(pid)}/candles?granularity=300&start=${start}&end=${end}`);
-          const cs = (candles||[]).sort((a,b)=> a[0]-b[0]);
-          if (cs.length>=2){
-            const first = cs[0], lastC = cs[cs.length-1];
-            const p0 = +first[3], p1 = +lastC[4];
-            mom60 = isFinite(p0)&&p0>0&&isFinite(p1)? Math.max(-1, Math.min(1, (p1-p0)/p0*5)) : 0;
-            const greens = cs.filter(c => (+c[4])>(+c[3])).length;
-            trendGreen = greens / cs.length;
-          }
-        }catch{}
-
-        // multiplicateur de volume vs moyenne 30j (si dispo)
-        let volXMap = 0;
-        try{
-          const volSum = await fetchJSON(`${EX}/products/volume-summary`);
-          const vm = volSum?.find?.(r => r.product_id === pid);
-          if (vm && +vm.volume_30day > 0){
-            const v24 = +vm.volume_24h || 0;
-            const v30 = +vm.volume_30day || 0;
-            const avgDaily = v30/30;
-            volXMap = Math.min(1, (v24/avgDaily)/3);
-          }
-        }catch{}
-
-        if (isFinite(item.high) && isFinite(item.low) && item.high>item.low && isFinite(item.last)){
-          const rng = item.high - item.low;
-          proxHigh = Math.max(0, Math.min(1, (item.last - item.low)/rng));
-        }
-
-        const conf = confidencePct({mom60, volX: volXMap, trendGreen, proxHigh});
-        return { ...item, conf };
-      }, 8, (done,total)=>{
-        const pct = 80 + Math.round(14*done/total);
-        setProgress(pct, `Confiance (bougies 1h)… ${done}/${total}`);
-      });
-
-      // 7) Market cap & rendu final (Top 30 triés par pct desc)
-      setProgress(94, 'Market caps…');
-      const mcMap = await mcMapPromise;
-      const rows = enriched
-        .map(x => ({ ...x, marketCapUsd: mcMap[(x.product.base_currency||'').toUpperCase()] || NaN }))
-        .sort((a,b)=> b.pct - a.pct)
-        .slice(0,30);
-
-      setProgress(98, `Rendu (${rows.length})…`);
-      render(rows, hours, volMin);
-      lastUpdate.textContent = `Dernière maj: ${toLocal(Date.now())}`;
-      setCounters({products: spot.length, statsOK, passed: enriched.length, shown: rows.length, volMin, hours});
-      setProgress(100, 'Terminé ✅');
-      startCountdown(300);
-      refreshBtn.disabled = false;
-      windowSel.disabled = false;
-      minVolSel.disabled = false;
-
-    }catch(err){
-      tbody.innerHTML = `<tr><td colspan="7" style="padding:18px;color:#ffb4b4">Erreur: ${err.message}. Nouvelle tentative dans 60s…</td></tr>`;
-      setProgress(0, `Erreur: ${err.message}`);
-      setCounters({});
-      startCountdown(60);
-      refreshBtn.disabled = false;
-      windowSel.disabled = false;
-      minVolSel.disabled = false;
-    }
-  }
-
-  function render(rows, hours, volMin){
-    if (!rows.length){
-      tbody.innerHTML = `<tr><td colspan="7" style="padding:18px;color:#9aa0b4">Aucune donnée (prix &gt; 1 $, vol24h ≥ ${new Intl.NumberFormat('fr-FR').format(volMin)} $, hausse &gt; ${MIN_PCT}% sur ${hours}h).</td></tr>`;
-      return;
-    }
-    tbody.innerHTML = rows.map((r,i)=>{
-      const p = r.product;
-      const asset = `${p.base_currency}-${p.quote_currency}`;
-      const mc = isFinite(r.marketCapUsd)? fmtCompact(r.marketCapUsd) : '—';
-      const vol = isFinite(r.volUsd)? fmtCompact(r.volUsd) : '—';
-      const pos = r.pct>=0;
-      return `
-      <tr>
-        <td>${i+1}</td>
-        <td>
-          <div style="display:flex;gap:10px;align-items:center">
-            <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:.7"></div>
-            <div>
-              <div>${p.base_currency} <span class="sym">(${asset})</span></div>
-              <div class="sym hide-sm" style="font-size:12px">
-                <a href="https://exchange.coinbase.com/trade/${encodeURIComponent(asset)}" target="_blank" style="color:var(--accent)">Ouvrir sur Coinbase</a>
-              </div>
-            </div>
-          </div>
-        </td>
-        <td class="hide-sm num">${fmtUSD(r.last)}</td>
-        <td class="hide-sm num">${mc}</td>
-        <td class="hide-sm num">${vol}</td>
-        <td class="num ${pos?'pos':'neg'}">${fmtPct(r.pct)}</td>
-        <td class="num"><strong>${r.conf ?? 0} %</strong></td>
-      </tr>`;
-    }).join('');
-  }
-
-  // Interactions
-  document.getElementById('refreshBtn').addEventListener('click', load);
-  windowSel.addEventListener('change', load);
-  minVolSel.addEventListener('change', load);
-  document.addEventListener('visibilitychange', ()=>{ if (!document.hidden && countdown < 5) load(); });
-
-  // Premier chargement
-  load();
-})();
-</script>
+  <!-- UI = module principal ; data.js exporte les fonctions de traitement -->
+  <script type="module" src="top20.js"></script>
 </body>
 </html>
