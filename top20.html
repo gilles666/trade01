@@ -34,9 +34,9 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
 </head>
 <body>
 <header>
-  <h1>Top 30 — % de hausse · Coinbasev8</h1>
+  <h1>Top 30 — % de hausse · Coinbase v9</h1>
   <div class="controls">
-    <label for="windowSel" class="sym">Fenêtre % :</label>
+    <label class="sym" for="windowSel">Fenêtre % :</label>
     <select id="windowSel">
       <option value="24">24h</option>
       <option value="12">12h</option>
@@ -44,6 +44,15 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
       <option value="3">3h</option>
       <option value="1">1h</option>
     </select>
+
+    <label class="sym" for="minVolSel">Volume 24h min (USD) :</label>
+    <select id="minVolSel">
+      <option value="1000">1 000</option>
+      <option value="10000">10 000</option>
+      <option value="100000">100 000</option>
+      <option value="1000000" selected>1 000 000</option>
+    </select>
+
     <span class="pill" id="lastUpdate">Dernière maj: —</span>
     <span class="pill" id="nextIn">Prochaine maj dans: —</span>
     <button id="refreshBtn" class="btn">↻ Actualiser</button>
@@ -75,12 +84,12 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
 
 <footer style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:var(--muted)">
   <div>Sources : Coinbase (prix/vol.) · CoinCap (market cap)</div>
-  <div><small>Filtres : prix &gt; 1 $ · vol24h &gt; 1 M $ · % &gt; 1 % — Auto-refresh 5 min</small></div>
+  <div><small>Filtres : prix &gt; 1 $ · % &gt; 1 % · vol24h ≥ seuil — Auto-refresh 5 min</small></div>
 </footer>
 
 <script>
 (async function(){
-  // 👉 Ton Worker Cloudflare (avec /coinbase)
+  // 👉 Ton Worker Cloudflare
   const EX = 'https://spring-mud-37a1.gilles-e74.workers.dev/coinbase';
   const COINCAP = 'https://api.coincap.io/v2/assets?limit=2000';
   const MIN_PCT = 1; // ne garder que > 1%
@@ -93,6 +102,7 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
   const statusEl = document.getElementById('status');
   const countersEl = document.getElementById('counters');
   const windowSel = document.getElementById('windowSel');
+  const minVolSel = document.getElementById('minVolSel');
 
   const fmtUSD = v => isFinite(+v)? new Intl.NumberFormat('fr-FR',{style:'currency',currency:'USD',maximumFractionDigits:(+v>=1?2:6),minimumFractionDigits:(+v>=1?2:4)}).format(+v):'—';
   const fmtCompact = v => isFinite(+v)? new Intl.NumberFormat('fr-FR',{notation:'compact',maximumFractionDigits:2}).format(+v):'—';
@@ -111,11 +121,13 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
     return res.json();
   }
   function setProgress(pct, txt){ bar.style.width = Math.max(0, Math.min(100, pct)) + '%'; statusEl.textContent = txt || ''; }
-  function setCounters({products=0, statsOK=0, passed=0, shown=0}){
+  function setCounters({products=0, statsOK=0, passed=0, shown=0, volMin=0, hours=24}){
     countersEl.innerHTML = [
+      ['Fenêtre %', hours+'h'],
+      ['Vol 24h min (USD)', new Intl.NumberFormat('fr-FR').format(volMin)],
       ['Produits USD/USDT', products],
       ['Stats ok', statsOK],
-      ['Filtre OK (prix>1$, vol24h>1M$, %>'+MIN_PCT+'%)', passed],
+      ['Filtre OK (prix>1$, vol≥seuil, %>'+MIN_PCT+'%)', passed],
       ['Affichés', shown],
     ].map(([k,v])=>`<span class="counter">${k}: <strong>${v}</strong></span>`).join('');
   }
@@ -160,7 +172,6 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
   async function percentChangeFromCandles(productId, hours){
     const now = Date.now();
     const end = new Date(now).toISOString();
-    // marge de 5 min pour être sûr d’avoir au moins une bougie au début
     const start = new Date(now - (hours*60+5)*60*1000).toISOString();
     const candles = await fetchJSON(`${EX}/products/${encodeURIComponent(productId)}/candles?granularity=300&start=${start}&end=${end}`);
     const cs = (candles||[]).sort((a,b)=> a[0]-b[0]); // [time, low, high, open, close, volume]
@@ -171,13 +182,14 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
     return (lastClose - firstClose) / firstClose * 100;
   }
 
-  // Charge + calcule selon la fenêtre sélectionnée
   async function load(){
-    const hours = +windowSel.value; // 24|12|6|3|1
+    const hours = +windowSel.value;
+    const volMin = +minVolSel.value; // nouveau seuil volume en USD
     refreshBtn.disabled = true;
     windowSel.disabled = true;
+    minVolSel.disabled = true;
     try{
-      setProgress(0, `Préparation (fenêtre ${hours}h)…`); setCounters({});
+      setProgress(0, `Préparation (fenêtre ${hours}h, vol≥${volMin})…`); setCounters({volMin, hours});
       const mcMapPromise = buildMarketCapMap();
 
       // 1) Produits
@@ -189,7 +201,7 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
         !p.trading_disabled && !p.cancel_only && !p.post_only
       );
 
-      // 2) Stats 24h pour prix/vol et %24h (utile même si fenêtre != 24h)
+      // 2) Stats 24h pour prix/vol
       let statsOK=0;
       setProgress(18, `Stats 24h (prix & vol)… 0/${spot.length}`);
       const statsList = await mapPool(spot, async (p)=>{
@@ -204,20 +216,18 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
         setProgress(pct, `Stats 24h (prix & vol)… ${done}/${total}`);
       });
 
-      setCounters({products: spot.length, statsOK});
+      setCounters({products: spot.length, statsOK, volMin, hours});
       const baseStats = statsList.filter(Boolean);
 
-      // 3) Filtre prix >1$ & vol24h >1M$ d'abord
-      setProgress(54, 'Filtre prix>1$ & vol24h>1M$…');
-      let preFiltered = baseStats.filter(x => isFinite(x.last) && x.last > 1 ;
+      // 3) Filtre prix >1$ & vol24h ≥ seuil choisi
+      setProgress(54, `Filtre prix>1$ & vol24h≥${volMin}…`);
+      let preFiltered = baseStats.filter(x => isFinite(x.last) && x.last > 1 && isFinite(x.volUsd) && x.volUsd >= volMin);
 
       // 4) Calcul du % fenêtre
       let withPct = [];
       if (hours === 24){
-        // Utilise le %24h des stats
         withPct = preFiltered.map(x => ({...x, pct: x.pct24}));
       } else {
-        // Calcule via candles 5m uniquement pour les paires pré-filtrées
         setProgress(60, `Calcul % ${hours}h via bougies… 0/${preFiltered.length}`);
         const pctList = await mapPool(preFiltered, async (x)=>{
           const pct = await percentChangeFromCandles(x.product.id, hours);
@@ -229,11 +239,11 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
         withPct = pctList.filter(Boolean);
       }
 
-      // 5) Applique le filtre % > 1%
+      // 5) Filtre % > 1 %
       const passed = withPct.filter(x => isFinite(x.pct) && x.pct > MIN_PCT);
 
       // 6) Confiance (bougies 1h) sur la liste passée
-      setCounters({products: spot.length, statsOK, passed: passed.length});
+      setCounters({products: spot.length, statsOK, passed: passed.length, volMin, hours});
       setProgress(80, `Confiance (bougies 1h)… 0/${passed.length}`);
       const enriched = await mapPool(passed, async (item)=>{
         const pid = item.product.id;
@@ -255,7 +265,6 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
         }catch{}
 
         // multiplicateur de volume vs moyenne 30j (si dispo)
-        // (note: on pourrait charger volume-summary, mais on peut aussi ignorer si rate limit)
         let volXMap = 0;
         try{
           const volSum = await fetchJSON(`${EX}/products/volume-summary`);
@@ -289,13 +298,14 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
         .slice(0,30);
 
       setProgress(98, `Rendu (${rows.length})…`);
-      render(rows, hours);
+      render(rows, hours, volMin);
       lastUpdate.textContent = `Dernière maj: ${toLocal(Date.now())}`;
-      setCounters({products: spot.length, statsOK, passed: enriched.length, shown: rows.length});
+      setCounters({products: spot.length, statsOK, passed: enriched.length, shown: rows.length, volMin, hours});
       setProgress(100, 'Terminé ✅');
       startCountdown(300);
       refreshBtn.disabled = false;
       windowSel.disabled = false;
+      minVolSel.disabled = false;
 
     }catch(err){
       tbody.innerHTML = `<tr><td colspan="7" style="padding:18px;color:#ffb4b4">Erreur: ${err.message}. Nouvelle tentative dans 60s…</td></tr>`;
@@ -304,12 +314,13 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
       startCountdown(60);
       refreshBtn.disabled = false;
       windowSel.disabled = false;
+      minVolSel.disabled = false;
     }
   }
 
-  function render(rows, hours){
+  function render(rows, hours, volMin){
     if (!rows.length){
-      tbody.innerHTML = `<tr><td colspan="7" style="padding:18px;color:#9aa0b4">Aucune donnée après filtrage (prix &gt; 1 $, vol24h &gt; 1 M $, hausse &gt; ${MIN_PCT}% sur ${hours}h).</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:18px;color:#9aa0b4">Aucune donnée (prix &gt; 1 $, vol24h ≥ ${new Intl.NumberFormat('fr-FR').format(volMin)} $, hausse &gt; ${MIN_PCT}% sur ${hours}h).</td></tr>`;
       return;
     }
     tbody.innerHTML = rows.map((r,i)=>{
@@ -344,6 +355,7 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
   // Interactions
   document.getElementById('refreshBtn').addEventListener('click', load);
   windowSel.addEventListener('change', load);
+  minVolSel.addEventListener('change', load);
   document.addEventListener('visibilitychange', ()=>{ if (!document.hidden && countdown < 5) load(); });
 
   // Premier chargement
