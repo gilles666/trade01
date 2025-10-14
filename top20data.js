@@ -6,15 +6,11 @@ const COINCAP = 'https://api.coincap.io/v2/assets?limit=2000';
 
 // Utilitaires
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function fetchJSON(url, init = {}) {
-  const res = await fetch(url, {
-    ...init,
-    headers: { Accept: 'application/json', ...(init.headers || {}) },
-    cache: 'no-store',
-  });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText} @ ${url}`);
-  return res.json();
-}
+  async function fetchJSON(url, init={}) {
+    const res = await fetch(url, { ...init, headers: { 'Accept': 'application/json', ...(init.headers||{}) }, cache:'no-store' });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText} @ ${url}`);
+    return res.json();
+  }
 
 // Pool de requêtes avec concurrence bornée
 async function mapPool(items, worker, concurrency = 8, onProgress) {
