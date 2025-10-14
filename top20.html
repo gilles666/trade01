@@ -209,7 +209,7 @@ tbody tr:hover{background:rgba(124,140,255,.05)}
 
       // 3) Filtre prix >1$ & vol24h >1M$ d'abord
       setProgress(54, 'Filtre prix>1$ & vol24h>1M$…');
-      let preFiltered = baseStats.filter(x => isFinite(x.last) && x.last > 1 && isFinite(x.volUsd) && x.volUsd > 1_000_000);
+      let preFiltered = baseStats.filter(x => isFinite(x.last) && x.last > 1 ;
 
       // 4) Calcul du % fenêtre
       let withPct = [];
