@@ -1,5 +1,5 @@
 // ui.js — gestion interface (ES module)
-import { loadDataset } from './data.js';
+import { loadDataset } from './top20data.js';
 
 // DOM
 const tbody = document.getElementById('tbody');
