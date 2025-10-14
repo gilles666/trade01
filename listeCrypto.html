@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Variation cryptos sur période</title>
+  <style>
+    body {font-family: Arial, sans-serif; margin:20px;}
+    table {border-collapse: collapse; width:100%;}
+    th, td {border:1px solid #ddd; padding:8px; text-align:center;}
+    th {cursor:pointer; background:#f4f4f4;}
+    input {margin:5px;}
+  </style>
+</head>
+<body>
+
+<h2>Variation des cryptomonnaies</h2>
+
+<label>Début : <input type="datetime-local" id="start"></label>
+<label>Fin   : <input type="datetime-local" id="end"></label>
+<button id="run">Rechercher</button>
+
+<table id="resultTable">
+  <thead>
+    <tr>
+      <th data-key="name">Nom de l'Asset</th>
+      <th data-key="priceStart">Prix au début (USD)</th>
+      <th data-key="priceEnd">Prix à la fin (USD)</th>
+      <th data-key="pctChange">% de variation</th>
+      <th data-key="totalVolume">Total volume (USD)</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script src="app.js"></script>
+</body>
+</html>
